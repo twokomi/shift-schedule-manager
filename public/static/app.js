@@ -1,6 +1,7 @@
 // 근무표 데이터 저장
 let schedulesData = [];
 let copiedData = null; // 복사된 데이터 저장
+let pendingChanges = []; // 저장 대기 중인 변경사항
 
 // 페이지 로드 시 실행
 document.addEventListener('DOMContentLoaded', () => {
@@ -27,7 +28,9 @@ async function loadSchedules() {
 
         if (response.data.success) {
             schedulesData = response.data.data;
+            pendingChanges = []; // 조회 시 대기 중인 변경사항 초기화
             renderSchedules(schedulesData);
+            updateSaveButtonState();
         } else {
             container.innerHTML = `
                 <div class="text-center py-8 text-red-500">
@@ -91,14 +94,25 @@ function renderSchedules(schedules) {
                 <li><i class="fas fa-mouse-pointer mr-2"></i><strong>우클릭</strong>: 셀을 복사합니다</li>
                 <li><i class="fas fa-paste mr-2"></i><strong>좌클릭</strong>: 복사한 내용을 붙여넣습니다</li>
                 <li><i class="fas fa-edit mr-2"></i><strong>Shift + 좌클릭</strong>: 직접 수정합니다</li>
+                <li><i class="fas fa-trash mr-2"></i><strong>Delete 또는 Backspace 키</strong>: 선택한 셀의 작업자를 제거합니다</li>
             </ul>
-            <div class="mt-2 text-sm text-blue-600" id="copiedInfo" style="display: none;">
-                <i class="fas fa-clipboard-check mr-2"></i>
-                <span id="copiedText"></span>
+            <div class="mt-2 flex items-center justify-between">
+                <div class="text-sm text-blue-600" id="copiedInfo" style="display: none;">
+                    <i class="fas fa-clipboard-check mr-2"></i>
+                    <span id="copiedText"></span>
+                </div>
+                <div class="flex gap-2 items-center">
+                    <span class="text-sm text-gray-600" id="pendingCount">저장되지 않은 변경사항: 0개</span>
+                    <button id="saveAllBtn" onclick="saveAllChanges()" disabled
+                            class="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-md transition duration-200">
+                        <i class="fas fa-save mr-2"></i>
+                        모두 저장
+                    </button>
+                </div>
             </div>
         </div>
         <div class="overflow-x-auto">
-            <table class="min-w-full border-collapse">
+            <table class="min-w-full border-collapse" id="scheduleTable">
                 <thead>
                     <tr class="bg-gray-100">
                         <th class="border border-gray-300 px-4 py-2 text-left font-semibold">날짜</th>
@@ -187,6 +201,9 @@ function renderSchedules(schedules) {
     `;
 
     container.innerHTML = html;
+    
+    // 키보드 이벤트 리스너 추가
+    setupKeyboardListeners();
 }
 
 // 셀 렌더링 함수
@@ -201,8 +218,10 @@ function renderCell(scheduleId, position, assignment) {
             data-position="${position}"
             data-employee="${escapedEmployee}"
             data-team="${escapedTeam}"
+            tabindex="0"
             onclick="handleCellClick(event, this)"
-            oncontextmenu="handleCellRightClick(event, this); return false;">
+            oncontextmenu="handleCellRightClick(event, this); return false;"
+            onfocus="selectCell(this)">
             <div class="flex flex-col items-center gap-1">
                 ${assignment.team ? `<span class="team-badge-${assignment.team} px-2 py-1 rounded text-xs font-semibold">${assignment.team}</span>` : ''}
                 <span class="font-medium">${assignment.employee_name || '-'}</span>
@@ -211,9 +230,49 @@ function renderCell(scheduleId, position, assignment) {
     `;
 }
 
+// 선택된 셀 추적
+let selectedCell = null;
+
+function selectCell(cellElement) {
+    // 이전 선택 해제
+    if (selectedCell) {
+        selectedCell.style.outline = '';
+    }
+    // 새로운 셀 선택
+    selectedCell = cellElement;
+    selectedCell.style.outline = '2px solid #3b82f6';
+}
+
+// 키보드 이벤트 리스너 설정
+function setupKeyboardListeners() {
+    document.addEventListener('keydown', handleKeyDown);
+}
+
+function handleKeyDown(event) {
+    if (!selectedCell) return;
+    
+    // Delete 또는 Backspace 키로 작업자 제거
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault();
+        removeAssignment(selectedCell);
+    }
+}
+
+// 작업자 제거
+function removeAssignment(cellElement) {
+    const scheduleId = cellElement.getAttribute('data-schedule-id');
+    const position = cellElement.getAttribute('data-position');
+    
+    if (confirm('이 셀의 작업자를 제거하시겠습니까?')) {
+        updateCellContentLocal(cellElement, '', '');
+        addPendingChange(scheduleId, position, '', '');
+    }
+}
+
 // 셀 우클릭 - 복사
 function handleCellRightClick(event, cellElement) {
     event.preventDefault();
+    selectCell(cellElement);
     
     const employeeName = cellElement.getAttribute('data-employee');
     const team = cellElement.getAttribute('data-team');
@@ -223,20 +282,17 @@ function handleCellRightClick(event, cellElement) {
         team: team
     };
     
-    // 복사 완료 표시
+    // 복사 완료 표시 (타임아웃 제거)
     const copiedInfo = document.getElementById('copiedInfo');
     const copiedText = document.getElementById('copiedText');
     copiedText.textContent = `복사됨: ${team ? `[${team}] ` : ''}${employeeName || '(빈 셀)'}`;
     copiedInfo.style.display = 'block';
-    
-    // 3초 후 메시지 숨김
-    setTimeout(() => {
-        copiedInfo.style.display = 'none';
-    }, 3000);
 }
 
 // 셀 클릭 - 붙여넣기 또는 수정
 function handleCellClick(event, cellElement) {
+    selectCell(cellElement);
+    
     const scheduleId = cellElement.getAttribute('data-schedule-id');
     const position = cellElement.getAttribute('data-position');
     const currentEmployee = cellElement.getAttribute('data-employee');
@@ -258,8 +314,9 @@ function handleCellClick(event, cellElement) {
 }
 
 // 붙여넣기
-async function pasteAssignment(cellElement, scheduleId, position, employeeName, team) {
-    await updateAssignment(cellElement, scheduleId, position, employeeName, team);
+function pasteAssignment(cellElement, scheduleId, position, employeeName, team) {
+    updateCellContentLocal(cellElement, employeeName, team);
+    addPendingChange(scheduleId, position, employeeName, team);
 }
 
 // 배치 수정 (직접 입력)
@@ -270,31 +327,12 @@ function editAssignment(cellElement, scheduleId, position, currentEmployee, curr
     const newTeam = prompt(`팀을 입력하세요 (A, B, C, D) (현재: ${currentTeam || '없음'}):`, currentTeam);
     if (newTeam === null) return; // 취소
 
-    updateAssignment(cellElement, scheduleId, position, newEmployee, newTeam);
+    updateCellContentLocal(cellElement, newEmployee, newTeam);
+    addPendingChange(scheduleId, position, newEmployee, newTeam);
 }
 
-// 배치 업데이트 API 호출
-async function updateAssignment(cellElement, scheduleId, position, employeeName, team) {
-    try {
-        const response = await axios.put(`/api/assignments/${scheduleId}/${position}`, {
-            employee_name: employeeName,
-            team: team
-        });
-
-        if (response.data.success) {
-            // 해당 셀만 업데이트 (스크롤 위치 유지)
-            updateCellContent(cellElement, employeeName, team);
-        } else {
-            alert('오류: ' + response.data.error);
-        }
-    } catch (error) {
-        console.error('Error updating assignment:', error);
-        alert('근무 배치 업데이트에 실패했습니다.');
-    }
-}
-
-// 셀 내용만 업데이트 (전체 새로고침 없이)
-function updateCellContent(cellElement, employeeName, team) {
+// 로컬에서 셀 내용만 업데이트 (서버 저장 전)
+function updateCellContentLocal(cellElement, employeeName, team) {
     // 데이터 속성 업데이트
     cellElement.setAttribute('data-employee', employeeName);
     cellElement.setAttribute('data-team', team);
@@ -309,6 +347,86 @@ function updateCellContent(cellElement, employeeName, team) {
             <span class="font-medium">${employeeDisplay}</span>
         </div>
     `;
+    
+    // 변경 표시 (노란색 배경)
+    cellElement.style.backgroundColor = '#fef3c7';
+}
+
+// 대기 중인 변경사항 추가
+function addPendingChange(scheduleId, position, employeeName, team) {
+    // 이미 있는 변경사항이면 업데이트
+    const existingIndex = pendingChanges.findIndex(
+        change => change.scheduleId === scheduleId && change.position === position
+    );
+    
+    if (existingIndex !== -1) {
+        pendingChanges[existingIndex] = { scheduleId, position, employeeName, team };
+    } else {
+        pendingChanges.push({ scheduleId, position, employeeName, team });
+    }
+    
+    updateSaveButtonState();
+}
+
+// 저장 버튼 상태 업데이트
+function updateSaveButtonState() {
+    const saveBtn = document.getElementById('saveAllBtn');
+    const countSpan = document.getElementById('pendingCount');
+    
+    if (saveBtn && countSpan) {
+        countSpan.textContent = `저장되지 않은 변경사항: ${pendingChanges.length}개`;
+        saveBtn.disabled = pendingChanges.length === 0;
+    }
+}
+
+// 모든 변경사항 저장
+async function saveAllChanges() {
+    if (pendingChanges.length === 0) return;
+    
+    const saveBtn = document.getElementById('saveAllBtn');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>저장 중...';
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const change of pendingChanges) {
+        try {
+            const response = await axios.put(`/api/assignments/${change.scheduleId}/${change.position}`, {
+                employee_name: change.employeeName,
+                team: change.team
+            });
+            
+            if (response.data.success) {
+                successCount++;
+                // 저장 완료된 셀의 배경색 제거
+                const cell = document.querySelector(
+                    `[data-schedule-id="${change.scheduleId}"][data-position="${change.position}"]`
+                );
+                if (cell) {
+                    cell.style.backgroundColor = '';
+                }
+            } else {
+                failCount++;
+            }
+        } catch (error) {
+            console.error('Error saving assignment:', error);
+            failCount++;
+        }
+    }
+    
+    // 결과 표시
+    if (failCount === 0) {
+        alert(`모든 변경사항이 저장되었습니다. (${successCount}개)`);
+        pendingChanges = [];
+    } else {
+        alert(`저장 완료: ${successCount}개\n실패: ${failCount}개`);
+        // 실패한 항목들만 남김
+        pendingChanges = pendingChanges.slice(successCount);
+    }
+    
+    saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>모두 저장';
+    updateSaveButtonState();
 }
 
 // 날짜 포맷팅
@@ -323,3 +441,4 @@ function formatDate(dateStr) {
 window.loadSchedules = loadSchedules;
 window.handleCellClick = handleCellClick;
 window.handleCellRightClick = handleCellRightClick;
+window.saveAllChanges = saveAllChanges;
