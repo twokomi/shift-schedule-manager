@@ -286,14 +286,17 @@ function renderEmployeeSummary(schedules) {
         });
     });
     
-    // 이름순 정렬
-    const sortedEmployees = Object.entries(employeeHours).sort((a, b) => 
+    // 이름순 정렬 (기본값)
+    let sortedEmployees = Object.entries(employeeHours).sort((a, b) => 
         a[0].localeCompare(b[0])
     );
     
     if (sortedEmployees.length === 0) {
         return '';
     }
+    
+    // 정렬 상태 저장을 위한 ID
+    const tableId = 'employeeSummaryTable';
     
     let html = `
         <div class="mt-6 bg-white rounded-lg shadow-lg p-6">
@@ -302,21 +305,82 @@ function renderEmployeeSummary(schedules) {
                 담당자별 근무시간 집계
             </h2>
             <div class="overflow-x-auto">
-                <table class="min-w-full border-collapse">
+                <table id="${tableId}" class="min-w-full border-collapse">
                     <thead>
                         <tr class="bg-gray-100">
-                            <th class="border border-gray-300 px-4 py-2 text-left font-semibold">담당자</th>
-                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold">팀</th>
-                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold">Day 근무</th>
-                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold">Night 근무</th>
-                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold">총 근무일</th>
-                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold">총 근무시간</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left font-semibold cursor-pointer hover:bg-gray-200" 
+                                onclick="sortTable('name')" title="클릭하여 정렬">
+                                담당자 
+                                <i class="fas fa-sort ml-1 text-gray-400"></i>
+                            </th>
+                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold cursor-pointer hover:bg-gray-200" 
+                                onclick="sortTable('team')" title="클릭하여 정렬">
+                                팀 
+                                <i class="fas fa-sort ml-1 text-gray-400"></i>
+                            </th>
+                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold cursor-pointer hover:bg-gray-200" 
+                                onclick="sortTable('dayCount')" title="클릭하여 정렬">
+                                Day 근무 
+                                <i class="fas fa-sort ml-1 text-gray-400"></i>
+                            </th>
+                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold cursor-pointer hover:bg-gray-200" 
+                                onclick="sortTable('nightCount')" title="클릭하여 정렬">
+                                Night 근무 
+                                <i class="fas fa-sort ml-1 text-gray-400"></i>
+                            </th>
+                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold cursor-pointer hover:bg-gray-200" 
+                                onclick="sortTable('totalDays')" title="클릭하여 정렬">
+                                총 근무일 
+                                <i class="fas fa-sort ml-1 text-gray-400"></i>
+                            </th>
+                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold cursor-pointer hover:bg-gray-200" 
+                                onclick="sortTable('totalHours')" title="클릭하여 정렬">
+                                총 근무시간 
+                                <i class="fas fa-sort ml-1 text-gray-400"></i>
+                            </th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="employeeSummaryBody">
     `;
     
     sortedEmployees.forEach(([name, data]) => {
+        const totalDays = data.dayCount + data.nightCount;
+        html += `
+            <tr class="hover:bg-gray-50">
+                <td class="border border-gray-300 px-4 py-2 font-medium">${name}</td>
+                <td class="border border-gray-300 px-4 py-2 text-center">
+                    ${data.team ? `<span class="team-badge-${data.team} px-2 py-1 rounded text-xs font-semibold">${data.team}</span>` : '-'}
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center">${data.dayCount}일</td>
+                <td class="border border-gray-300 px-4 py-2 text-center">${data.nightCount}일</td>
+                <td class="border border-gray-300 px-4 py-2 text-center font-semibold">${totalDays}일</td>
+                <td class="border border-gray-300 px-4 py-2 text-center font-semibold text-blue-600">${data.totalHours.toFixed(1)}시간</td>
+            </tr>
+        `;
+    });
+    
+    // 합계 행 추가
+    const totalDayCount = sortedEmployees.reduce((sum, [_, data]) => sum + data.dayCount, 0);
+    const totalNightCount = sortedEmployees.reduce((sum, [_, data]) => sum + data.nightCount, 0);
+    const totalDays = totalDayCount + totalNightCount;
+    const totalHours = sortedEmployees.reduce((sum, [_, data]) => sum + data.totalHours, 0);
+    
+    html += `
+                        <tr class="bg-blue-50 font-bold">
+                            <td class="border border-gray-300 px-4 py-2" colspan="2">합계</td>
+                            <td class="border border-gray-300 px-4 py-2 text-center">${totalDayCount}일</td>
+                            <td class="border border-gray-300 px-4 py-2 text-center">${totalNightCount}일</td>
+                            <td class="border border-gray-300 px-4 py-2 text-center">${totalDays}일</td>
+                            <td class="border border-gray-300 px-4 py-2 text-center text-blue-600">${totalHours.toFixed(1)}시간</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
         const totalDays = data.dayCount + data.nightCount;
         html += `
             <tr class="hover:bg-gray-50">
@@ -759,14 +823,17 @@ async function saveAllChanges() {
     if (failCount === 0) {
         alert(`모든 변경사항이 저장되었습니다. (${successCount}개)`);
         pendingChanges = [];
+        
+        // 저장 후 자동으로 스케줄 새로고침하여 집계 업데이트
+        await loadSchedules();
     } else {
         alert(`저장 완료: ${successCount}개\n실패: ${failCount}개`);
         // 실패한 항목들만 남김
         pendingChanges = pendingChanges.slice(successCount);
+        
+        saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>모두 저장';
+        updateSaveButtonState();
     }
-    
-    saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>모두 저장';
-    updateSaveButtonState();
 }
 
 // 날짜 포맷팅
@@ -873,3 +940,122 @@ window.handleCellMouseEnter = handleCellMouseEnter;
 window.handleCellMouseUp = handleCellMouseUp;
 window.handleCellDoubleClick = handleCellDoubleClick;
 window.saveAllChanges = saveAllChanges;
+window.sortTable = sortTable;
+
+// 테이블 정렬 기능
+let currentSortColumn = 'name';
+let currentSortDirection = 'asc';
+
+function sortTable(column) {
+    // 같은 컬럼을 다시 클릭하면 방향 전환
+    if (currentSortColumn === column) {
+        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSortColumn = column;
+        currentSortDirection = 'asc';
+    }
+    
+    // 테이블 본문 가져오기
+    const tbody = document.getElementById('employeeSummaryBody');
+    if (!tbody) return;
+    
+    // 합계 행 제외하고 데이터 행만 가져오기
+    const rows = Array.from(tbody.querySelectorAll('tr:not(.bg-blue-50)'));
+    const summaryRow = tbody.querySelector('tr.bg-blue-50');
+    
+    // 정렬
+    rows.sort((a, b) => {
+        let aValue, bValue;
+        
+        switch(column) {
+            case 'name':
+                aValue = a.cells[0].textContent.trim();
+                bValue = b.cells[0].textContent.trim();
+                return currentSortDirection === 'asc' 
+                    ? aValue.localeCompare(bValue)
+                    : bValue.localeCompare(aValue);
+                
+            case 'team':
+                aValue = a.cells[1].textContent.trim();
+                bValue = b.cells[1].textContent.trim();
+                return currentSortDirection === 'asc' 
+                    ? aValue.localeCompare(bValue)
+                    : bValue.localeCompare(aValue);
+                
+            case 'dayCount':
+                aValue = parseInt(a.cells[2].textContent);
+                bValue = parseInt(b.cells[2].textContent);
+                return currentSortDirection === 'asc' 
+                    ? aValue - bValue
+                    : bValue - aValue;
+                
+            case 'nightCount':
+                aValue = parseInt(a.cells[3].textContent);
+                bValue = parseInt(b.cells[3].textContent);
+                return currentSortDirection === 'asc' 
+                    ? aValue - bValue
+                    : bValue - aValue;
+                
+            case 'totalDays':
+                aValue = parseInt(a.cells[4].textContent);
+                bValue = parseInt(b.cells[4].textContent);
+                return currentSortDirection === 'asc' 
+                    ? aValue - bValue
+                    : bValue - aValue;
+                
+            case 'totalHours':
+                aValue = parseFloat(a.cells[5].textContent);
+                bValue = parseFloat(b.cells[5].textContent);
+                return currentSortDirection === 'asc' 
+                    ? aValue - bValue
+                    : bValue - aValue;
+                
+            default:
+                return 0;
+        }
+    });
+    
+    // 테이블 다시 구성
+    tbody.innerHTML = '';
+    rows.forEach(row => tbody.appendChild(row));
+    if (summaryRow) {
+        tbody.appendChild(summaryRow);
+    }
+    
+    // 정렬 아이콘 업데이트
+    updateSortIcons(column);
+}
+
+function updateSortIcons(sortedColumn) {
+    // 모든 헤더의 정렬 아이콘 초기화
+    const headers = document.querySelectorAll('#employeeSummaryTable thead th');
+    headers.forEach(header => {
+        const icon = header.querySelector('i');
+        if (icon) {
+            icon.className = 'fas fa-sort ml-1 text-gray-400';
+        }
+    });
+    
+    // 현재 정렬된 컬럼의 아이콘 업데이트
+    const columnMap = {
+        'name': 0,
+        'team': 1,
+        'dayCount': 2,
+        'nightCount': 3,
+        'totalDays': 4,
+        'totalHours': 5
+    };
+    
+    const columnIndex = columnMap[sortedColumn];
+    if (columnIndex !== undefined) {
+        const header = headers[columnIndex];
+        const icon = header.querySelector('i');
+        if (icon) {
+            if (currentSortDirection === 'asc') {
+                icon.className = 'fas fa-sort-up ml-1 text-blue-600';
+            } else {
+                icon.className = 'fas fa-sort-down ml-1 text-blue-600';
+            }
+        }
+    }
+}
