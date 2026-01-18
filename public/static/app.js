@@ -3,6 +3,10 @@ let schedulesData = [];
 let copiedData = null; // 복사된 데이터 저장
 let pendingChanges = []; // 저장 대기 중인 변경사항
 
+// 드래그 선택 관련 변수
+let isDragging = false;
+let dragStartCell = null;
+
 // 페이지 로드 시 실행
 document.addEventListener('DOMContentLoaded', () => {
     loadSchedules();
@@ -92,9 +96,10 @@ function renderSchedules(schedules) {
             </h3>
             <ul class="text-sm text-blue-700 space-y-1">
                 <li><i class="fas fa-mouse-pointer mr-2"></i><strong>클릭</strong>: 셀을 선택합니다</li>
+                <li><i class="fas fa-hand-pointer mr-2"></i><strong>드래그</strong>: 여러 셀을 드래그하여 선택합니다</li>
                 <li><i class="fas fa-copy mr-2"></i><strong>Ctrl/Cmd + C</strong>: 선택한 셀을 복사합니다</li>
                 <li><i class="fas fa-paste mr-2"></i><strong>Ctrl/Cmd + V</strong>: 복사한 내용을 붙여넣습니다</li>
-                <li><i class="fas fa-check-square mr-2"></i><strong>Ctrl/Cmd + 클릭</strong>: 여러 셀을 선택합니다</li>
+                <li><i class="fas fa-check-square mr-2"></i><strong>Ctrl/Cmd + 클릭</strong>: 여러 셀을 개별 선택합니다</li>
                 <li><i class="fas fa-trash mr-2"></i><strong>Delete 또는 Backspace</strong>: 선택한 셀의 작업자를 제거합니다</li>
                 <li><i class="fas fa-edit mr-2"></i><strong>더블클릭</strong>: 직접 수정합니다</li>
             </ul>
@@ -221,7 +226,9 @@ function renderCell(scheduleId, position, assignment) {
             data-employee="${escapedEmployee}"
             data-team="${escapedTeam}"
             tabindex="0"
-            onclick="handleCellClick(event, this)"
+            onmousedown="handleCellMouseDown(event, this)"
+            onmouseenter="handleCellMouseEnter(event, this)"
+            onmouseup="handleCellMouseUp(event, this)"
             ondblclick="handleCellDoubleClick(event, this)">
             <div class="flex flex-col items-center gap-1">
                 ${assignment.team ? `<span class="team-badge-${assignment.team} px-2 py-1 rounded text-xs font-semibold">${assignment.team}</span>` : ''}
@@ -261,6 +268,12 @@ function selectCell(cellElement, isMultiSelect = false) {
 // 키보드 이벤트 리스너 설정
 function setupKeyboardListeners() {
     document.addEventListener('keydown', handleKeyDown);
+    
+    // 드래그 종료 이벤트 (전역)
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+        dragStartCell = null;
+    });
 }
 
 function handleKeyDown(event) {
@@ -345,6 +358,121 @@ function handleCellClick(event, cellElement) {
     
     // 일반 클릭: 단일 선택
     selectCell(cellElement, false);
+}
+
+// 셀 마우스 다운 - 드래그 시작
+function handleCellMouseDown(event, cellElement) {
+    // 더블클릭 방지를 위해 약간의 지연
+    if (event.detail === 2) return; // 더블클릭이면 무시
+    
+    // Ctrl/Cmd 키를 누르고 있으면 개별 선택 모드
+    if (event.ctrlKey || event.metaKey) {
+        const isMultiSelect = true;
+        selectCell(cellElement, isMultiSelect);
+        return;
+    }
+    
+    // 드래그 시작
+    isDragging = true;
+    dragStartCell = cellElement;
+    
+    // 이전 선택 모두 해제하고 시작 셀 선택
+    selectedCells.forEach(cell => {
+        cell.style.outline = '';
+    });
+    selectedCells = [cellElement];
+    cellElement.style.outline = '2px solid #3b82f6';
+    
+    // 텍스트 선택 방지
+    event.preventDefault();
+}
+
+// 셀 마우스 엔터 - 드래그 중
+function handleCellMouseEnter(event, cellElement) {
+    if (!isDragging || !dragStartCell) return;
+    
+    // 드래그 범위의 모든 셀 선택
+    selectCellsInRange(dragStartCell, cellElement);
+}
+
+// 셀 마우스 업 - 드래그 종료
+function handleCellMouseUp(event, cellElement) {
+    isDragging = false;
+}
+
+// 범위 내의 모든 셀 선택
+function selectCellsInRange(startCell, endCell) {
+    // 모든 편집 가능한 셀 가져오기
+    const allCells = Array.from(document.querySelectorAll('td.editable'));
+    
+    const startIndex = allCells.indexOf(startCell);
+    const endIndex = allCells.indexOf(endCell);
+    
+    if (startIndex === -1 || endIndex === -1) return;
+    
+    // 시작과 끝 인덱스 정렬
+    const minIndex = Math.min(startIndex, endIndex);
+    const maxIndex = Math.max(startIndex, endIndex);
+    
+    // 이전 선택 모두 해제
+    selectedCells.forEach(cell => {
+        cell.style.outline = '';
+    });
+    
+    // 범위 내의 셀들 선택
+    selectedCells = [];
+    
+    // 같은 행에 있는 셀들만 선택 (좌우 드래그)
+    const startRow = startCell.parentElement;
+    const endRow = endCell.parentElement;
+    
+    if (startRow === endRow) {
+        // 같은 행: 좌우 드래그
+        const rowCells = Array.from(startRow.querySelectorAll('td.editable'));
+        const startColIndex = rowCells.indexOf(startCell);
+        const endColIndex = rowCells.indexOf(endCell);
+        const minCol = Math.min(startColIndex, endColIndex);
+        const maxCol = Math.max(startColIndex, endColIndex);
+        
+        for (let i = minCol; i <= maxCol; i++) {
+            selectedCells.push(rowCells[i]);
+            rowCells[i].style.outline = '2px solid #3b82f6';
+        }
+    } else {
+        // 다른 행: 상하 드래그 또는 2D 영역
+        const allRows = Array.from(document.querySelectorAll('tr'));
+        const startRowIndex = allRows.indexOf(startRow);
+        const endRowIndex = allRows.indexOf(endRow);
+        
+        if (startRowIndex === -1 || endRowIndex === -1) return;
+        
+        const minRow = Math.min(startRowIndex, endRowIndex);
+        const maxRow = Math.max(startRowIndex, endRowIndex);
+        
+        // 시작 셀과 끝 셀의 열 인덱스 구하기
+        const startRowCells = Array.from(startRow.querySelectorAll('td.editable'));
+        const endRowCells = Array.from(endRow.querySelectorAll('td.editable'));
+        const startColIndex = startRowCells.indexOf(startCell);
+        const endColIndex = endRowCells.indexOf(endCell);
+        
+        // 각 행에서 해당 열 범위의 셀들 선택
+        for (let r = minRow; r <= maxRow; r++) {
+            const row = allRows[r];
+            const rowCells = Array.from(row.querySelectorAll('td.editable'));
+            
+            if (rowCells.length === 0) continue;
+            
+            const minCol = Math.min(startColIndex, endColIndex);
+            const maxCol = Math.max(startColIndex, endColIndex);
+            
+            for (let c = minCol; c <= maxCol; c++) {
+                if (c >= 0 && c < rowCells.length) {
+                    selectedCells.push(rowCells[c]);
+                    rowCells[c].style.outline = '2px solid #3b82f6';
+                }
+            }
+        }
+    }
 }
 
 // 셀 더블클릭 - 직접 수정
@@ -477,6 +605,8 @@ function formatDate(dateStr) {
 
 // 전역 함수로 등록
 window.loadSchedules = loadSchedules;
-window.handleCellClick = handleCellClick;
+window.handleCellMouseDown = handleCellMouseDown;
+window.handleCellMouseEnter = handleCellMouseEnter;
+window.handleCellMouseUp = handleCellMouseUp;
 window.handleCellDoubleClick = handleCellDoubleClick;
 window.saveAllChanges = saveAllChanges;
