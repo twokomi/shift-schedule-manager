@@ -94,7 +94,8 @@ function renderSchedules(schedules) {
                 <li><i class="fas fa-mouse-pointer mr-2"></i><strong>우클릭</strong>: 셀을 복사합니다</li>
                 <li><i class="fas fa-paste mr-2"></i><strong>좌클릭</strong>: 복사한 내용을 붙여넣습니다</li>
                 <li><i class="fas fa-edit mr-2"></i><strong>Shift + 좌클릭</strong>: 직접 수정합니다</li>
-                <li><i class="fas fa-trash mr-2"></i><strong>Delete 또는 Backspace 키</strong>: 선택한 셀의 작업자를 제거합니다</li>
+                <li><i class="fas fa-check-square mr-2"></i><strong>Ctrl/Cmd + 좌클릭</strong>: 여러 셀을 선택합니다</li>
+                <li><i class="fas fa-trash mr-2"></i><strong>Delete 또는 Backspace 키</strong>: 선택한 모든 셀의 작업자를 제거합니다</li>
             </ul>
             <div class="mt-2 flex items-center justify-between">
                 <div class="text-sm text-blue-600" id="copiedInfo" style="display: none;">
@@ -230,17 +231,31 @@ function renderCell(scheduleId, position, assignment) {
     `;
 }
 
-// 선택된 셀 추적
-let selectedCell = null;
+// 선택된 셀들 추적 (복수 선택 지원)
+let selectedCells = [];
 
-function selectCell(cellElement) {
-    // 이전 선택 해제
-    if (selectedCell) {
-        selectedCell.style.outline = '';
+function selectCell(cellElement, isMultiSelect = false) {
+    if (!isMultiSelect) {
+        // 단일 선택: 이전 선택 모두 해제
+        selectedCells.forEach(cell => {
+            cell.style.outline = '';
+        });
+        selectedCells = [cellElement];
+    } else {
+        // 복수 선택: 이미 선택되어 있으면 해제, 아니면 추가
+        const index = selectedCells.indexOf(cellElement);
+        if (index !== -1) {
+            selectedCells.splice(index, 1);
+            cellElement.style.outline = '';
+        } else {
+            selectedCells.push(cellElement);
+        }
     }
-    // 새로운 셀 선택
-    selectedCell = cellElement;
-    selectedCell.style.outline = '2px solid #3b82f6';
+    
+    // 선택된 모든 셀에 테두리 표시
+    selectedCells.forEach(cell => {
+        cell.style.outline = '2px solid #3b82f6';
+    });
 }
 
 // 키보드 이벤트 리스너 설정
@@ -249,30 +264,37 @@ function setupKeyboardListeners() {
 }
 
 function handleKeyDown(event) {
-    if (!selectedCell) return;
+    if (selectedCells.length === 0) return;
     
     // Delete 또는 Backspace 키로 작업자 제거
     if (event.key === 'Delete' || event.key === 'Backspace') {
         event.preventDefault();
-        removeAssignment(selectedCell);
+        removeAssignments(selectedCells);
     }
 }
 
-// 작업자 제거
-function removeAssignment(cellElement) {
-    const scheduleId = cellElement.getAttribute('data-schedule-id');
-    const position = cellElement.getAttribute('data-position');
+// 여러 작업자 제거
+function removeAssignments(cellElements) {
+    if (cellElements.length === 0) return;
     
-    if (confirm('이 셀의 작업자를 제거하시겠습니까?')) {
-        updateCellContentLocal(cellElement, '', '');
-        addPendingChange(scheduleId, position, '', '');
+    const count = cellElements.length;
+    if (confirm(`선택한 ${count}개 셀의 작업자를 제거하시겠습니까?`)) {
+        cellElements.forEach(cellElement => {
+            const scheduleId = cellElement.getAttribute('data-schedule-id');
+            const position = cellElement.getAttribute('data-position');
+            updateCellContentLocal(cellElement, '', '');
+            addPendingChange(scheduleId, position, '', '');
+        });
     }
 }
 
 // 셀 우클릭 - 복사
 function handleCellRightClick(event, cellElement) {
     event.preventDefault();
-    selectCell(cellElement);
+    
+    // Ctrl/Cmd 키가 눌려있지 않으면 단일 선택
+    const isMultiSelect = event.ctrlKey || event.metaKey;
+    selectCell(cellElement, isMultiSelect);
     
     const employeeName = cellElement.getAttribute('data-employee');
     const team = cellElement.getAttribute('data-team');
@@ -291,18 +313,27 @@ function handleCellRightClick(event, cellElement) {
 
 // 셀 클릭 - 붙여넣기 또는 수정
 function handleCellClick(event, cellElement) {
-    selectCell(cellElement);
-    
     const scheduleId = cellElement.getAttribute('data-schedule-id');
     const position = cellElement.getAttribute('data-position');
     const currentEmployee = cellElement.getAttribute('data-employee');
     const currentTeam = cellElement.getAttribute('data-team');
     
+    // Ctrl/Cmd 키를 누르고 클릭하면 복수 선택 모드
+    if (event.ctrlKey || event.metaKey) {
+        const isMultiSelect = true;
+        selectCell(cellElement, isMultiSelect);
+        return;
+    }
+    
     // Shift 키를 누르고 클릭하면 직접 수정 모드
     if (event.shiftKey) {
+        selectCell(cellElement, false);
         editAssignment(cellElement, scheduleId, position, currentEmployee, currentTeam);
         return;
     }
+    
+    // 일반 클릭
+    selectCell(cellElement, false);
     
     // 복사된 데이터가 있으면 붙여넣기
     if (copiedData) {
