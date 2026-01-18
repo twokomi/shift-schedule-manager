@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "webapp",
+  "name": "shift-schedule-manager",
   "compatibility_date": "2026-01-18",
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
@@ -9,8 +9,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "webapp-production",
-      "database_id": "local-db"
+      "database_name": "shift-schedule-manager-production",
+      "database_id": "dac263ff-ee56-4273-8fae-9045ec43170d"
     }
   ]
 }
