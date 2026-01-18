@@ -91,11 +91,12 @@ function renderSchedules(schedules) {
                 사용 방법
             </h3>
             <ul class="text-sm text-blue-700 space-y-1">
-                <li><i class="fas fa-mouse-pointer mr-2"></i><strong>우클릭</strong>: 셀을 복사합니다</li>
-                <li><i class="fas fa-paste mr-2"></i><strong>좌클릭</strong>: 복사한 내용을 붙여넣습니다</li>
-                <li><i class="fas fa-edit mr-2"></i><strong>Shift + 좌클릭</strong>: 직접 수정합니다</li>
-                <li><i class="fas fa-check-square mr-2"></i><strong>Ctrl/Cmd + 좌클릭</strong>: 여러 셀을 선택합니다</li>
-                <li><i class="fas fa-trash mr-2"></i><strong>Delete 또는 Backspace 키</strong>: 선택한 모든 셀의 작업자를 제거합니다</li>
+                <li><i class="fas fa-mouse-pointer mr-2"></i><strong>클릭</strong>: 셀을 선택합니다</li>
+                <li><i class="fas fa-copy mr-2"></i><strong>Ctrl/Cmd + C</strong>: 선택한 셀을 복사합니다</li>
+                <li><i class="fas fa-paste mr-2"></i><strong>Ctrl/Cmd + V</strong>: 복사한 내용을 붙여넣습니다</li>
+                <li><i class="fas fa-check-square mr-2"></i><strong>Ctrl/Cmd + 클릭</strong>: 여러 셀을 선택합니다</li>
+                <li><i class="fas fa-trash mr-2"></i><strong>Delete 또는 Backspace</strong>: 선택한 셀의 작업자를 제거합니다</li>
+                <li><i class="fas fa-edit mr-2"></i><strong>더블클릭</strong>: 직접 수정합니다</li>
             </ul>
             <div class="mt-2 flex items-center justify-between">
                 <div class="text-sm text-blue-600" id="copiedInfo" style="display: none;">
@@ -221,8 +222,7 @@ function renderCell(scheduleId, position, assignment) {
             data-team="${escapedTeam}"
             tabindex="0"
             onclick="handleCellClick(event, this)"
-            oncontextmenu="handleCellRightClick(event, this); return false;"
-            onfocus="selectCell(this)">
+            ondblclick="handleCellDoubleClick(event, this)">
             <div class="flex flex-col items-center gap-1">
                 ${assignment.team ? `<span class="team-badge-${assignment.team} px-2 py-1 rounded text-xs font-semibold">${assignment.team}</span>` : ''}
                 <span class="font-medium">${assignment.employee_name || '-'}</span>
@@ -264,13 +264,59 @@ function setupKeyboardListeners() {
 }
 
 function handleKeyDown(event) {
-    if (selectedCells.length === 0) return;
+    // Ctrl+C / Cmd+C: 복사
+    if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
+        event.preventDefault();
+        copySelectedCell();
+        return;
+    }
     
-    // Delete 또는 Backspace 키로 작업자 제거
-    if (event.key === 'Delete' || event.key === 'Backspace') {
+    // Ctrl+V / Cmd+V: 붙여넣기
+    if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
+        event.preventDefault();
+        pasteToSelectedCells();
+        return;
+    }
+    
+    // Delete 또는 Backspace: 삭제
+    if (selectedCells.length > 0 && (event.key === 'Delete' || event.key === 'Backspace')) {
         event.preventDefault();
         removeAssignments(selectedCells);
+        return;
     }
+}
+
+// 선택된 셀 복사
+function copySelectedCell() {
+    if (selectedCells.length === 0) return;
+    
+    // 첫 번째 선택된 셀의 데이터 복사
+    const cellElement = selectedCells[0];
+    const employeeName = cellElement.getAttribute('data-employee');
+    const team = cellElement.getAttribute('data-team');
+    
+    copiedData = {
+        employee_name: employeeName,
+        team: team
+    };
+    
+    // 복사 완료 표시
+    const copiedInfo = document.getElementById('copiedInfo');
+    const copiedText = document.getElementById('copiedText');
+    copiedText.textContent = `복사됨: ${team ? `[${team}] ` : ''}${employeeName || '(빈 셀)'}`;
+    copiedInfo.style.display = 'block';
+}
+
+// 선택된 셀들에 붙여넣기
+function pasteToSelectedCells() {
+    if (selectedCells.length === 0 || !copiedData) return;
+    
+    selectedCells.forEach(cellElement => {
+        const scheduleId = cellElement.getAttribute('data-schedule-id');
+        const position = cellElement.getAttribute('data-position');
+        updateCellContentLocal(cellElement, copiedData.employee_name, copiedData.team);
+        addPendingChange(scheduleId, position, copiedData.employee_name, copiedData.team);
+    });
 }
 
 // 여러 작업자 제거
@@ -288,36 +334,8 @@ function removeAssignments(cellElements) {
     }
 }
 
-// 셀 우클릭 - 복사
-function handleCellRightClick(event, cellElement) {
-    event.preventDefault();
-    
-    // Ctrl/Cmd 키가 눌려있지 않으면 단일 선택
-    const isMultiSelect = event.ctrlKey || event.metaKey;
-    selectCell(cellElement, isMultiSelect);
-    
-    const employeeName = cellElement.getAttribute('data-employee');
-    const team = cellElement.getAttribute('data-team');
-    
-    copiedData = {
-        employee_name: employeeName,
-        team: team
-    };
-    
-    // 복사 완료 표시 (타임아웃 제거)
-    const copiedInfo = document.getElementById('copiedInfo');
-    const copiedText = document.getElementById('copiedText');
-    copiedText.textContent = `복사됨: ${team ? `[${team}] ` : ''}${employeeName || '(빈 셀)'}`;
-    copiedInfo.style.display = 'block';
-}
-
-// 셀 클릭 - 붙여넣기 또는 수정
+// 셀 클릭 - 선택
 function handleCellClick(event, cellElement) {
-    const scheduleId = cellElement.getAttribute('data-schedule-id');
-    const position = cellElement.getAttribute('data-position');
-    const currentEmployee = cellElement.getAttribute('data-employee');
-    const currentTeam = cellElement.getAttribute('data-team');
-    
     // Ctrl/Cmd 키를 누르고 클릭하면 복수 선택 모드
     if (event.ctrlKey || event.metaKey) {
         const isMultiSelect = true;
@@ -325,29 +343,18 @@ function handleCellClick(event, cellElement) {
         return;
     }
     
-    // Shift 키를 누르고 클릭하면 직접 수정 모드
-    if (event.shiftKey) {
-        selectCell(cellElement, false);
-        editAssignment(cellElement, scheduleId, position, currentEmployee, currentTeam);
-        return;
-    }
-    
-    // 일반 클릭
+    // 일반 클릭: 단일 선택
     selectCell(cellElement, false);
-    
-    // 복사된 데이터가 있으면 붙여넣기
-    if (copiedData) {
-        pasteAssignment(cellElement, scheduleId, position, copiedData.employee_name, copiedData.team);
-    } else {
-        // 복사된 데이터가 없으면 직접 수정
-        editAssignment(cellElement, scheduleId, position, currentEmployee, currentTeam);
-    }
 }
 
-// 붙여넣기
-function pasteAssignment(cellElement, scheduleId, position, employeeName, team) {
-    updateCellContentLocal(cellElement, employeeName, team);
-    addPendingChange(scheduleId, position, employeeName, team);
+// 셀 더블클릭 - 직접 수정
+function handleCellDoubleClick(event, cellElement) {
+    const scheduleId = cellElement.getAttribute('data-schedule-id');
+    const position = cellElement.getAttribute('data-position');
+    const currentEmployee = cellElement.getAttribute('data-employee');
+    const currentTeam = cellElement.getAttribute('data-team');
+    
+    editAssignment(cellElement, scheduleId, position, currentEmployee, currentTeam);
 }
 
 // 배치 수정 (직접 입력)
@@ -471,5 +478,5 @@ function formatDate(dateStr) {
 // 전역 함수로 등록
 window.loadSchedules = loadSchedules;
 window.handleCellClick = handleCellClick;
-window.handleCellRightClick = handleCellRightClick;
+window.handleCellDoubleClick = handleCellDoubleClick;
 window.saveAllChanges = saveAllChanges;
