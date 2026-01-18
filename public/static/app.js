@@ -7,6 +7,10 @@ let pendingChanges = []; // 저장 대기 중인 변경사항
 let isDragging = false;
 let dragStartCell = null;
 
+// Undo/Redo 관련 변수
+let undoStack = []; // 되돌리기 스택
+let redoStack = []; // 다시 실행 스택
+
 // 페이지 로드 시 실행
 document.addEventListener('DOMContentLoaded', () => {
     loadSchedules();
@@ -99,6 +103,8 @@ function renderSchedules(schedules) {
                 <li><i class="fas fa-hand-pointer mr-2"></i><strong>드래그</strong>: 여러 셀을 드래그하여 선택합니다</li>
                 <li><i class="fas fa-copy mr-2"></i><strong>Ctrl/Cmd + C</strong>: 선택한 셀을 복사합니다</li>
                 <li><i class="fas fa-paste mr-2"></i><strong>Ctrl/Cmd + V</strong>: 복사한 내용을 붙여넣습니다</li>
+                <li><i class="fas fa-undo mr-2"></i><strong>Ctrl/Cmd + Z</strong>: 되돌리기 (Undo)</li>
+                <li><i class="fas fa-redo mr-2"></i><strong>Ctrl/Cmd + Y</strong>: 다시 실행 (Redo)</li>
                 <li><i class="fas fa-check-square mr-2"></i><strong>Ctrl/Cmd + 클릭</strong>: 여러 셀을 개별 선택합니다</li>
                 <li><i class="fas fa-trash mr-2"></i><strong>Delete 또는 Backspace</strong>: 선택한 셀의 작업자를 제거합니다</li>
                 <li><i class="fas fa-edit mr-2"></i><strong>더블클릭</strong>: 직접 수정합니다</li>
@@ -291,6 +297,20 @@ function handleKeyDown(event) {
         return;
     }
     
+    // Ctrl+Z / Cmd+Z: 되돌리기 (Undo)
+    if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+        event.preventDefault();
+        undo();
+        return;
+    }
+    
+    // Ctrl+Y / Cmd+Y: 다시 실행 (Redo)
+    if ((event.ctrlKey || event.metaKey) && event.key === 'y') {
+        event.preventDefault();
+        redo();
+        return;
+    }
+    
     // Delete 또는 Backspace: 삭제
     if (selectedCells.length > 0 && (event.key === 'Delete' || event.key === 'Backspace')) {
         event.preventDefault();
@@ -324,11 +344,27 @@ function copySelectedCell() {
 function pasteToSelectedCells() {
     if (selectedCells.length === 0 || !copiedData) return;
     
+    // Undo를 위해 이전 상태 저장
+    const previousStates = selectedCells.map(cellElement => ({
+        scheduleId: cellElement.getAttribute('data-schedule-id'),
+        position: cellElement.getAttribute('data-position'),
+        employeeName: cellElement.getAttribute('data-employee'),
+        team: cellElement.getAttribute('data-team')
+    }));
+    
+    // 변경 수행
     selectedCells.forEach(cellElement => {
         const scheduleId = cellElement.getAttribute('data-schedule-id');
         const position = cellElement.getAttribute('data-position');
         updateCellContentLocal(cellElement, copiedData.employee_name, copiedData.team);
         addPendingChange(scheduleId, position, copiedData.employee_name, copiedData.team);
+    });
+    
+    // Undo 스택에 저장
+    addToUndoStack({
+        type: 'paste',
+        cells: previousStates,
+        newValue: { employeeName: copiedData.employee_name, team: copiedData.team }
     });
 }
 
@@ -338,11 +374,26 @@ function removeAssignments(cellElements) {
     
     const count = cellElements.length;
     if (confirm(`선택한 ${count}개 셀의 작업자를 제거하시겠습니까?`)) {
+        // Undo를 위해 이전 상태 저장
+        const previousStates = cellElements.map(cellElement => ({
+            scheduleId: cellElement.getAttribute('data-schedule-id'),
+            position: cellElement.getAttribute('data-position'),
+            employeeName: cellElement.getAttribute('data-employee'),
+            team: cellElement.getAttribute('data-team')
+        }));
+        
+        // 변경 수행
         cellElements.forEach(cellElement => {
             const scheduleId = cellElement.getAttribute('data-schedule-id');
             const position = cellElement.getAttribute('data-position');
             updateCellContentLocal(cellElement, '', '');
             addPendingChange(scheduleId, position, '', '');
+        });
+        
+        // Undo 스택에 저장
+        addToUndoStack({
+            type: 'delete',
+            cells: previousStates
         });
     }
 }
@@ -493,6 +544,18 @@ function editAssignment(cellElement, scheduleId, position, currentEmployee, curr
     const newTeam = prompt(`팀을 입력하세요 (A, B, C, D) (현재: ${currentTeam || '없음'}):`, currentTeam);
     if (newTeam === null) return; // 취소
 
+    // Undo를 위해 이전 상태 저장
+    addToUndoStack({
+        type: 'edit',
+        cells: [{
+            scheduleId: scheduleId,
+            position: position,
+            employeeName: currentEmployee,
+            team: currentTeam
+        }],
+        newValue: { employeeName: newEmployee, team: newTeam }
+    });
+
     updateCellContentLocal(cellElement, newEmployee, newTeam);
     addPendingChange(scheduleId, position, newEmployee, newTeam);
 }
@@ -601,6 +664,95 @@ function formatDate(dateStr) {
     const month = date.getMonth() + 1;
     const day = date.getDate();
     return `${month}/${day}`;
+}
+
+// Undo/Redo 기능
+function addToUndoStack(action) {
+    undoStack.push(action);
+    redoStack = []; // 새로운 작업 시 Redo 스택 초기화
+    
+    // 스택 크기 제한 (최대 50개)
+    if (undoStack.length > 50) {
+        undoStack.shift();
+    }
+}
+
+function undo() {
+    if (undoStack.length === 0) {
+        console.log('되돌릴 작업이 없습니다.');
+        return;
+    }
+    
+    const action = undoStack.pop();
+    
+    // 현재 상태를 Redo 스택에 저장
+    const currentStates = action.cells.map(cell => {
+        const cellElement = document.querySelector(
+            `[data-schedule-id="${cell.scheduleId}"][data-position="${cell.position}"]`
+        );
+        return {
+            scheduleId: cell.scheduleId,
+            position: cell.position,
+            employeeName: cellElement ? cellElement.getAttribute('data-employee') : '',
+            team: cellElement ? cellElement.getAttribute('data-team') : ''
+        };
+    });
+    
+    redoStack.push({
+        type: action.type,
+        cells: currentStates,
+        newValue: action.newValue
+    });
+    
+    // 이전 상태로 복원
+    action.cells.forEach(cell => {
+        const cellElement = document.querySelector(
+            `[data-schedule-id="${cell.scheduleId}"][data-position="${cell.position}"]`
+        );
+        if (cellElement) {
+            updateCellContentLocal(cellElement, cell.employeeName, cell.team);
+            addPendingChange(cell.scheduleId, cell.position, cell.employeeName, cell.team);
+        }
+    });
+}
+
+function redo() {
+    if (redoStack.length === 0) {
+        console.log('다시 실행할 작업이 없습니다.');
+        return;
+    }
+    
+    const action = redoStack.pop();
+    
+    // 현재 상태를 Undo 스택에 저장
+    const currentStates = action.cells.map(cell => {
+        const cellElement = document.querySelector(
+            `[data-schedule-id="${cell.scheduleId}"][data-position="${cell.position}"]`
+        );
+        return {
+            scheduleId: cell.scheduleId,
+            position: cell.position,
+            employeeName: cellElement ? cellElement.getAttribute('data-employee') : '',
+            team: cellElement ? cellElement.getAttribute('data-team') : ''
+        };
+    });
+    
+    undoStack.push({
+        type: action.type,
+        cells: currentStates,
+        newValue: action.newValue
+    });
+    
+    // 다시 실행
+    action.cells.forEach(cell => {
+        const cellElement = document.querySelector(
+            `[data-schedule-id="${cell.scheduleId}"][data-position="${cell.position}"]`
+        );
+        if (cellElement) {
+            updateCellContentLocal(cellElement, cell.employeeName, cell.team);
+            addPendingChange(cell.scheduleId, cell.position, cell.employeeName, cell.team);
+        }
+    });
 }
 
 // 전역 함수로 등록
