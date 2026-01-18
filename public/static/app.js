@@ -381,43 +381,6 @@ function renderEmployeeSummary(schedules) {
     
     return html;
 }
-        const totalDays = data.dayCount + data.nightCount;
-        html += `
-            <tr class="hover:bg-gray-50">
-                <td class="border border-gray-300 px-4 py-2 font-medium">${name}</td>
-                <td class="border border-gray-300 px-4 py-2 text-center">
-                    ${data.team ? `<span class="team-badge-${data.team} px-2 py-1 rounded text-xs font-semibold">${data.team}</span>` : '-'}
-                </td>
-                <td class="border border-gray-300 px-4 py-2 text-center">${data.dayCount}일</td>
-                <td class="border border-gray-300 px-4 py-2 text-center">${data.nightCount}일</td>
-                <td class="border border-gray-300 px-4 py-2 text-center font-semibold">${totalDays}일</td>
-                <td class="border border-gray-300 px-4 py-2 text-center font-semibold text-blue-600">${data.totalHours.toFixed(1)}시간</td>
-            </tr>
-        `;
-    });
-    
-    // 합계 행 추가
-    const totalDayCount = sortedEmployees.reduce((sum, [_, data]) => sum + data.dayCount, 0);
-    const totalNightCount = sortedEmployees.reduce((sum, [_, data]) => sum + data.nightCount, 0);
-    const totalDays = totalDayCount + totalNightCount;
-    const totalHours = sortedEmployees.reduce((sum, [_, data]) => sum + data.totalHours, 0);
-    
-    html += `
-                        <tr class="bg-blue-50 font-bold">
-                            <td class="border border-gray-300 px-4 py-2" colspan="2">합계</td>
-                            <td class="border border-gray-300 px-4 py-2 text-center">${totalDayCount}일</td>
-                            <td class="border border-gray-300 px-4 py-2 text-center">${totalNightCount}일</td>
-                            <td class="border border-gray-300 px-4 py-2 text-center">${totalDays}일</td>
-                            <td class="border border-gray-300 px-4 py-2 text-center text-blue-600">${totalHours.toFixed(1)}시간</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    `;
-    
-    return html;
-}
 
 // 선택된 셀들 추적 (복수 선택 지원)
 let selectedCells = [];
