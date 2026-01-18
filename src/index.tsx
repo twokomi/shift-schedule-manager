@@ -16,13 +16,58 @@ app.use('/static/*', serveStatic({ root: './public' }))
 
 // API Routes
 
-// 특정 날짜 범위의 근무표 조회
+// 특정 날짜 범위의 근무표 조회 (없으면 자동 생성)
 app.get('/api/schedules', async (c) => {
   const { env } = c;
   const startDate = c.req.query('start_date') || '2026-01-15';
   const endDate = c.req.query('end_date') || '2026-02-01';
 
   try {
+    // 날짜 범위의 모든 날짜 생성
+    const dates = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0];
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const dayOfWeek = dayNames[d.getDay()];
+      dates.push({ date: dateStr, day_of_week: dayOfWeek });
+    }
+
+    // 각 날짜에 대해 day/night shift 확인 및 생성
+    const dayPositions = ['Backend', 'Front#BT1', 'Front#BT2', 'Front#WT', 'Front#IM'];
+    const nightPositions = ['Backend', 'Front#BT', 'Front#WT'];
+
+    for (const { date, day_of_week } of dates) {
+      for (const shiftType of ['day', 'night']) {
+        // 해당 날짜/shift가 있는지 확인
+        const existing = await env.DB.prepare(`
+          SELECT id FROM schedules WHERE date = ? AND shift_type = ?
+        `).bind(date, shiftType).first();
+
+        if (!existing) {
+          // 스케줄 생성
+          const scheduleResult = await env.DB.prepare(`
+            INSERT INTO schedules (date, day_of_week, shift_type)
+            VALUES (?, ?, ?)
+          `).bind(date, day_of_week, shiftType).run();
+
+          const scheduleId = scheduleResult.meta.last_row_id;
+
+          // 포지션별 빈 배치 생성
+          const positions = shiftType === 'day' ? dayPositions : nightPositions;
+          for (const position of positions) {
+            await env.DB.prepare(`
+              INSERT INTO assignments (schedule_id, position, employee_name, team)
+              VALUES (?, ?, '', '')
+            `).bind(scheduleId, position).run();
+          }
+        }
+      }
+    }
+
+    // 생성 후 다시 조회
     const schedules = await env.DB.prepare(`
       SELECT 
         s.id,

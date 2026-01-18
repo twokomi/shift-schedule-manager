@@ -1,5 +1,6 @@
 // 근무표 데이터 저장
 let schedulesData = [];
+let copiedData = null; // 복사된 데이터 저장
 
 // 페이지 로드 시 실행
 document.addEventListener('DOMContentLoaded', () => {
@@ -81,6 +82,21 @@ function renderSchedules(schedules) {
 
     // 테이블 형식으로 렌더링
     let html = `
+        <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 class="text-lg font-semibold text-blue-800 mb-2">
+                <i class="fas fa-info-circle mr-2"></i>
+                사용 방법
+            </h3>
+            <ul class="text-sm text-blue-700 space-y-1">
+                <li><i class="fas fa-mouse-pointer mr-2"></i><strong>우클릭</strong>: 셀을 복사합니다</li>
+                <li><i class="fas fa-paste mr-2"></i><strong>좌클릭</strong>: 복사한 내용을 붙여넣습니다</li>
+                <li><i class="fas fa-edit mr-2"></i><strong>Shift + 좌클릭</strong>: 직접 수정합니다</li>
+            </ul>
+            <div class="mt-2 text-sm text-blue-600" id="copiedInfo" style="display: none;">
+                <i class="fas fa-clipboard-check mr-2"></i>
+                <span id="copiedText"></span>
+            </div>
+        </div>
         <div class="overflow-x-auto">
             <table class="min-w-full border-collapse">
                 <thead>
@@ -128,7 +144,8 @@ function renderSchedules(schedules) {
                     }
                     return `
                         <td class="border border-gray-300 px-2 py-2 text-center editable" 
-                            onclick="editAssignment(${daySchedule.id}, '${position}', '${assignment.employee_name}', '${assignment.team}')">
+                            onclick="handleCellClick(event, ${daySchedule.id}, '${position}', '${assignment.employee_name}', '${assignment.team}')"
+                            oncontextmenu="handleCellRightClick(event, '${assignment.employee_name}', '${assignment.team}'); return false;">
                             <div class="flex flex-col items-center gap-1">
                                 ${assignment.team ? `<span class="team-badge-${assignment.team} px-2 py-1 rounded text-xs font-semibold">${assignment.team}</span>` : ''}
                                 <span class="font-medium">${assignment.employee_name || '-'}</span>
@@ -168,7 +185,8 @@ function renderSchedules(schedules) {
                     }
                     return `
                         <td class="border border-gray-300 px-2 py-2 text-center editable" 
-                            onclick="editAssignment(${nightSchedule.id}, '${position}', '${assignment.employee_name}', '${assignment.team}')">
+                            onclick="handleCellClick(event, ${nightSchedule.id}, '${position}', '${assignment.employee_name}', '${assignment.team}')"
+                            oncontextmenu="handleCellRightClick(event, '${assignment.employee_name}', '${assignment.team}'); return false;">
                             <div class="flex flex-col items-center gap-1">
                                 ${assignment.team ? `<span class="team-badge-${assignment.team} px-2 py-1 rounded text-xs font-semibold">${assignment.team}</span>` : ''}
                                 <span class="font-medium">${assignment.employee_name || '-'}</span>
@@ -189,7 +207,49 @@ function renderSchedules(schedules) {
     container.innerHTML = html;
 }
 
-// 배치 수정
+// 셀 우클릭 - 복사
+function handleCellRightClick(event, employeeName, team) {
+    event.preventDefault();
+    copiedData = {
+        employee_name: employeeName,
+        team: team
+    };
+    
+    // 복사 완료 표시
+    const copiedInfo = document.getElementById('copiedInfo');
+    const copiedText = document.getElementById('copiedText');
+    copiedText.textContent = `복사됨: ${team ? `[${team}] ` : ''}${employeeName || '(빈 셀)'}`;
+    copiedInfo.style.display = 'block';
+    
+    // 3초 후 메시지 숨김
+    setTimeout(() => {
+        copiedInfo.style.display = 'none';
+    }, 3000);
+}
+
+// 셀 클릭 - 붙여넣기 또는 수정
+function handleCellClick(event, scheduleId, position, currentEmployee, currentTeam) {
+    // Shift 키를 누르고 클릭하면 직접 수정 모드
+    if (event.shiftKey) {
+        editAssignment(scheduleId, position, currentEmployee, currentTeam);
+        return;
+    }
+    
+    // 복사된 데이터가 있으면 붙여넣기
+    if (copiedData) {
+        pasteAssignment(scheduleId, position, copiedData.employee_name, copiedData.team);
+    } else {
+        // 복사된 데이터가 없으면 직접 수정
+        editAssignment(scheduleId, position, currentEmployee, currentTeam);
+    }
+}
+
+// 붙여넣기
+async function pasteAssignment(scheduleId, position, employeeName, team) {
+    await updateAssignment(scheduleId, position, employeeName, team);
+}
+
+// 배치 수정 (직접 입력)
 function editAssignment(scheduleId, position, currentEmployee, currentTeam) {
     const newEmployee = prompt(`직원 이름을 입력하세요 (현재: ${currentEmployee || '없음'}):`, currentEmployee);
     if (newEmployee === null) return; // 취소
@@ -209,7 +269,6 @@ async function updateAssignment(scheduleId, position, employeeName, team) {
         });
 
         if (response.data.success) {
-            alert('근무 배치가 업데이트되었습니다.');
             loadSchedules(); // 새로고침
         } else {
             alert('오류: ' + response.data.error);
@@ -230,4 +289,5 @@ function formatDate(dateStr) {
 
 // 전역 함수로 등록
 window.loadSchedules = loadSchedules;
-window.editAssignment = editAssignment;
+window.handleCellClick = handleCellClick;
+window.handleCellRightClick = handleCellRightClick;
