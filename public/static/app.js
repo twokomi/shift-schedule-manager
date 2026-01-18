@@ -93,35 +93,18 @@ function renderSchedules(schedules) {
 
     // 테이블 형식으로 렌더링
     let html = `
-        <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 class="text-lg font-semibold text-blue-800 mb-2">
-                <i class="fas fa-info-circle mr-2"></i>
-                사용 방법
-            </h3>
-            <ul class="text-sm text-blue-700 space-y-1">
-                <li><i class="fas fa-mouse-pointer mr-2"></i><strong>클릭</strong>: 셀을 선택합니다</li>
-                <li><i class="fas fa-hand-pointer mr-2"></i><strong>드래그</strong>: 여러 셀을 드래그하여 선택합니다</li>
-                <li><i class="fas fa-copy mr-2"></i><strong>Ctrl/Cmd + C</strong>: 선택한 셀을 복사합니다</li>
-                <li><i class="fas fa-paste mr-2"></i><strong>Ctrl/Cmd + V</strong>: 복사한 내용을 붙여넣습니다</li>
-                <li><i class="fas fa-undo mr-2"></i><strong>Ctrl/Cmd + Z</strong>: 되돌리기 (Undo)</li>
-                <li><i class="fas fa-redo mr-2"></i><strong>Ctrl/Cmd + Y</strong>: 다시 실행 (Redo)</li>
-                <li><i class="fas fa-check-square mr-2"></i><strong>Ctrl/Cmd + 클릭</strong>: 여러 셀을 개별 선택합니다</li>
-                <li><i class="fas fa-trash mr-2"></i><strong>Delete 또는 Backspace</strong>: 선택한 셀의 작업자를 제거합니다</li>
-                <li><i class="fas fa-edit mr-2"></i><strong>더블클릭</strong>: 직접 수정합니다</li>
-            </ul>
-            <div class="mt-2 flex items-center justify-between">
-                <div class="text-sm text-blue-600" id="copiedInfo" style="display: none;">
-                    <i class="fas fa-clipboard-check mr-2"></i>
-                    <span id="copiedText"></span>
-                </div>
-                <div class="flex gap-2 items-center">
-                    <span class="text-sm text-gray-600" id="pendingCount">저장되지 않은 변경사항: 0개</span>
-                    <button id="saveAllBtn" onclick="saveAllChanges()" disabled
-                            class="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-md transition duration-200">
-                        <i class="fas fa-save mr-2"></i>
-                        모두 저장
-                    </button>
-                </div>
+        <div class="mb-4 p-4 bg-white border border-gray-200 rounded-lg flex items-center justify-between">
+            <div class="text-sm text-blue-600" id="copiedInfo" style="display: none;">
+                <i class="fas fa-clipboard-check mr-2"></i>
+                <span id="copiedText"></span>
+            </div>
+            <div class="flex gap-2 items-center ml-auto">
+                <span class="text-sm text-gray-600" id="pendingCount">저장되지 않은 변경사항: 0개</span>
+                <button id="saveAllBtn" onclick="saveAllChanges()" disabled
+                        class="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-md transition duration-200">
+                    <i class="fas fa-save mr-2"></i>
+                    모두 저장
+                </button>
             </div>
         </div>
         <div class="overflow-x-auto">

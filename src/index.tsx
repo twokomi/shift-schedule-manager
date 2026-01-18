@@ -25,11 +25,14 @@ app.get('/api/schedules', async (c) => {
   try {
     // 날짜 범위의 모든 날짜 생성
     const dates = [];
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const start = new Date(startDate + 'T00:00:00');
+    const end = new Date(endDate + 'T00:00:00');
     
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().split('T')[0];
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const dayOfWeek = dayNames[d.getDay()];
       dates.push({ date: dateStr, day_of_week: dayOfWeek });
@@ -224,8 +227,133 @@ app.get('/api/employees', async (c) => {
   }
 });
 
-// Default route - 메인 페이지
+// 비밀번호 검증 API
+app.post('/api/auth/verify', async (c) => {
+  const { password } = await c.req.json();
+  const ADMIN_PASSWORD = 'admin1234'; // 실제로는 환경변수로 관리해야 함
+  
+  if (password === ADMIN_PASSWORD) {
+    return c.json({ success: true, message: 'Authentication successful' });
+  } else {
+    return c.json({ success: false, message: 'Invalid password' }, 401);
+  }
+});
+
+// Default route - 메인 페이지 (뷰 모드/편집 모드 자동 전환)
 app.get('/', (c) => {
+  const mode = c.req.query('mode') || 'view';
+  
+  if (mode === 'edit') {
+    return renderEditMode(c);
+  } else {
+    return renderViewMode(c);
+  }
+});
+
+// 뷰 모드 렌더링 (모바일 최적화)
+function renderViewMode(c: any) {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ko">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>근무표 조회</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            .team-badge-A { background-color: #3b82f6; color: white; }
+            .team-badge-B { background-color: #10b981; color: white; }
+            .team-badge-C { background-color: #f59e0b; color: white; }
+            .team-badge-D { background-color: #ef4444; color: white; }
+        </style>
+    </head>
+    <body class="bg-gray-50">
+        <div class="container mx-auto px-4 py-4 max-w-2xl">
+            <!-- 헤더 -->
+            <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-lg p-4 mb-4 text-white">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-2xl font-bold">
+                            <i class="fas fa-calendar-alt mr-2"></i>
+                            근무표 조회
+                        </h1>
+                        <p class="text-sm text-blue-100 mt-1">Day/Night 교대 근무 일정</p>
+                    </div>
+                    <button onclick="promptEditMode()" class="bg-white text-blue-600 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition">
+                        <i class="fas fa-edit mr-1"></i>
+                        편집
+                    </button>
+                </div>
+            </div>
+
+            <!-- 기간 선택 -->
+            <div class="bg-white rounded-lg shadow p-4 mb-4">
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">시작일</label>
+                        <input type="date" id="startDate" value="2026-01-15" 
+                               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">종료일</label>
+                        <input type="date" id="endDate" value="2026-02-01" 
+                               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <button onclick="loadSchedules()" 
+                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-200">
+                    <i class="fas fa-search mr-2"></i>
+                    조회
+                </button>
+            </div>
+
+            <!-- 팀 범례 -->
+            <div class="bg-white rounded-lg shadow p-3 mb-4">
+                <div class="flex gap-2 justify-center flex-wrap">
+                    <span class="team-badge-A px-3 py-1 rounded-full text-xs">Team A</span>
+                    <span class="team-badge-B px-3 py-1 rounded-full text-xs">Team B</span>
+                    <span class="team-badge-C px-3 py-1 rounded-full text-xs">Team C</span>
+                    <span class="team-badge-D px-3 py-1 rounded-full text-xs">Team D</span>
+                </div>
+            </div>
+
+            <!-- 근무표 컨테이너 -->
+            <div id="scheduleContainer">
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
+                    <p>근무표를 불러오는 중...</p>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script src="/static/view.js"></script>
+        <script>
+            function promptEditMode() {
+                const password = prompt('편집 모드 비밀번호를 입력하세요:');
+                if (password) {
+                    axios.post('/api/auth/verify', { password })
+                        .then(response => {
+                            if (response.data.success) {
+                                window.location.href = '/?mode=edit';
+                            } else {
+                                alert('비밀번호가 올바르지 않습니다.');
+                            }
+                        })
+                        .catch(error => {
+                            alert('인증에 실패했습니다.');
+                        });
+                }
+            }
+        </script>
+    </body>
+    </html>
+  `);
+}
+
+// 편집 모드 렌더링 (데스크톱 최적화)
+function renderEditMode(c: any) {
   return c.html(`
     <!DOCTYPE html>
     <html lang="ko">
@@ -322,7 +450,7 @@ app.get('/', (c) => {
         <script src="/static/app.js"></script>
     </body>
     </html>
-  `)
-})
+  `);
+}
 
 export default app
