@@ -287,8 +287,38 @@ function renderViewMode(c: any) {
                 </div>
             </div>
 
-            <!-- 기간 선택 -->
+            <!-- 조회 옵션 -->
             <div class="bg-white rounded-lg shadow p-4 mb-4">
+                <!-- 뷰 타입 선택 -->
+                <div class="flex gap-2 mb-4">
+                    <button onclick="switchView('all')" id="viewAll" 
+                            class="flex-1 py-2 px-3 rounded-lg font-semibold bg-blue-500 text-white transition">
+                        <i class="fas fa-list mr-1"></i>
+                        전체
+                    </button>
+                    <button onclick="switchView('employee')" id="viewEmployee"
+                            class="flex-1 py-2 px-3 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition">
+                        <i class="fas fa-user-check mr-1"></i>
+                        직원별
+                    </button>
+                </div>
+
+                <!-- 직원 검색 (직원별 뷰에서만 표시) -->
+                <div id="employeeFilter" class="hidden mb-4">
+                    <label class="block text-xs font-medium text-gray-700 mb-2">
+                        <i class="fas fa-search mr-1"></i>
+                        직원 검색 (복수 선택 가능)
+                    </label>
+                    <div id="employeeCheckboxes" class="space-y-2 mb-3 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                        <!-- JavaScript로 동적 생성 -->
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        선택한 직원: <span id="selectedCount" class="font-semibold">0명</span>
+                    </div>
+                </div>
+
+                <!-- 기간 선택 -->
                 <div class="grid grid-cols-2 gap-3 mb-3">
                     <div>
                         <label class="block text-xs font-medium text-gray-700 mb-1">시작일</label>
