@@ -389,11 +389,21 @@ function renderEditMode(c: any) {
     <body class="bg-gray-50">
         <div class="container mx-auto px-4 py-8">
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-                <h1 class="text-3xl font-bold text-gray-800 mb-2">
-                    <i class="fas fa-calendar-alt mr-2"></i>
-                    근무표 관리 시스템
-                </h1>
-                <p class="text-gray-600">Day/Night 교대 근무 일정 관리</p>
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                            <i class="fas fa-calendar-alt mr-2"></i>
+                            근무표 관리 시스템
+                            <span class="ml-3 text-sm bg-orange-100 text-orange-600 px-3 py-1 rounded-full">편집 모드</span>
+                        </h1>
+                        <p class="text-gray-600">Day/Night 교대 근무 일정 관리</p>
+                    </div>
+                    <button onclick="window.location.href='/'" 
+                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold transition">
+                        <i class="fas fa-eye mr-2"></i>
+                        뷰 모드로
+                    </button>
+                </div>
             </div>
 
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
