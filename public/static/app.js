@@ -213,6 +213,9 @@ function renderSchedules(schedules) {
         </div>
     `;
 
+    // 담당자별 근무시간 집계 추가
+    html += renderEmployeeSummary(schedules);
+
     container.innerHTML = html;
     
     // 키보드 이벤트 리스너 추가
@@ -242,6 +245,114 @@ function renderCell(scheduleId, position, assignment) {
             </div>
         </td>
     `;
+}
+
+// 담당자별 근무시간 집계 렌더링
+function renderEmployeeSummary(schedules) {
+    // Day shift: 12.5시간 (05:30~18:00)
+    // Night shift: 12.5시간 (17:30~06:00)
+    const DAY_SHIFT_HOURS = 12.5;
+    const NIGHT_SHIFT_HOURS = 12.5;
+    
+    // 담당자별 근무시간 집계
+    const employeeHours = {};
+    
+    schedules.forEach(schedule => {
+        schedule.assignments.forEach(assignment => {
+            if (assignment.employee_name && assignment.employee_name.trim() !== '') {
+                const name = assignment.employee_name;
+                if (!employeeHours[name]) {
+                    employeeHours[name] = {
+                        dayCount: 0,
+                        nightCount: 0,
+                        totalHours: 0,
+                        team: assignment.team || ''
+                    };
+                }
+                
+                if (schedule.shift_type === 'day') {
+                    employeeHours[name].dayCount++;
+                    employeeHours[name].totalHours += DAY_SHIFT_HOURS;
+                } else {
+                    employeeHours[name].nightCount++;
+                    employeeHours[name].totalHours += NIGHT_SHIFT_HOURS;
+                }
+                
+                // 팀 정보 업데이트 (가장 최근 팀 정보 사용)
+                if (assignment.team) {
+                    employeeHours[name].team = assignment.team;
+                }
+            }
+        });
+    });
+    
+    // 이름순 정렬
+    const sortedEmployees = Object.entries(employeeHours).sort((a, b) => 
+        a[0].localeCompare(b[0])
+    );
+    
+    if (sortedEmployees.length === 0) {
+        return '';
+    }
+    
+    let html = `
+        <div class="mt-6 bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-user-clock mr-2"></i>
+                담당자별 근무시간 집계
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="border border-gray-300 px-4 py-2 text-left font-semibold">담당자</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold">팀</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold">Day 근무</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold">Night 근무</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold">총 근무일</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold">총 근무시간</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+    
+    sortedEmployees.forEach(([name, data]) => {
+        const totalDays = data.dayCount + data.nightCount;
+        html += `
+            <tr class="hover:bg-gray-50">
+                <td class="border border-gray-300 px-4 py-2 font-medium">${name}</td>
+                <td class="border border-gray-300 px-4 py-2 text-center">
+                    ${data.team ? `<span class="team-badge-${data.team} px-2 py-1 rounded text-xs font-semibold">${data.team}</span>` : '-'}
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center">${data.dayCount}일</td>
+                <td class="border border-gray-300 px-4 py-2 text-center">${data.nightCount}일</td>
+                <td class="border border-gray-300 px-4 py-2 text-center font-semibold">${totalDays}일</td>
+                <td class="border border-gray-300 px-4 py-2 text-center font-semibold text-blue-600">${data.totalHours.toFixed(1)}시간</td>
+            </tr>
+        `;
+    });
+    
+    // 합계 행 추가
+    const totalDayCount = sortedEmployees.reduce((sum, [_, data]) => sum + data.dayCount, 0);
+    const totalNightCount = sortedEmployees.reduce((sum, [_, data]) => sum + data.nightCount, 0);
+    const totalDays = totalDayCount + totalNightCount;
+    const totalHours = sortedEmployees.reduce((sum, [_, data]) => sum + data.totalHours, 0);
+    
+    html += `
+                        <tr class="bg-blue-50 font-bold">
+                            <td class="border border-gray-300 px-4 py-2" colspan="2">합계</td>
+                            <td class="border border-gray-300 px-4 py-2 text-center">${totalDayCount}일</td>
+                            <td class="border border-gray-300 px-4 py-2 text-center">${totalNightCount}일</td>
+                            <td class="border border-gray-300 px-4 py-2 text-center">${totalDays}일</td>
+                            <td class="border border-gray-300 px-4 py-2 text-center text-blue-600">${totalHours.toFixed(1)}시간</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    
+    return html;
 }
 
 // 선택된 셀들 추적 (복수 선택 지원)
