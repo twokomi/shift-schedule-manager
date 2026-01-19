@@ -4,6 +4,24 @@ let schedulesData = [];
 let selectedEmployees = new Set();
 let currentView = 'all'; // 'all' or 'employee'
 
+// Update current date and time display
+function updateCurrentDateTime() {
+    const now = new Date();
+    
+    // Format date: "Monday, January 19, 2026"
+    const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    const dateStr = now.toLocaleDateString('en-US', dateOptions);
+    
+    // Format time: "14:35:20"
+    const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
+    
+    const dateDisplay = document.getElementById('currentDateDisplay');
+    const timeDisplay = document.getElementById('currentTimeDisplay');
+    
+    if (dateDisplay) dateDisplay.textContent = dateStr;
+    if (timeDisplay) timeDisplay.textContent = timeStr;
+}
+
 // Execute on page load
 document.addEventListener('DOMContentLoaded', () => {
     // Set today's date as default for Daily view
@@ -21,6 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
         monthSelect.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     }
     
+    // Update date/time display and refresh every second
+    updateCurrentDateTime();
+    setInterval(updateCurrentDateTime, 1000);
+    
     // Load data after setting dates
     loadEmployeeList();
     loadSchedules();
@@ -35,17 +57,20 @@ function switchView(viewType) {
     const employeeBtn = document.getElementById('viewEmployee');
     const employeeFilter = document.getElementById('employeeFilter');
     const dateRangeFilter = document.getElementById('dateRangeFilter');
+    const currentDateTime = document.getElementById('currentDateTime');
     
     if (viewType === 'all') {
         allBtn.className = 'flex-1 py-2 px-3 rounded-lg font-semibold bg-blue-500 text-white transition';
         employeeBtn.className = 'flex-1 py-2 px-3 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition';
         employeeFilter.classList.add('hidden');
         dateRangeFilter.classList.remove('hidden');
+        if (currentDateTime) currentDateTime.classList.remove('hidden');
     } else {
         allBtn.className = 'flex-1 py-2 px-3 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition';
         employeeBtn.className = 'flex-1 py-2 px-3 rounded-lg font-semibold bg-blue-500 text-white transition';
         employeeFilter.classList.remove('hidden');
         dateRangeFilter.classList.add('hidden');
+        if (currentDateTime) currentDateTime.classList.add('hidden');
     }
     
     // Re-render data

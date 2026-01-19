@@ -303,6 +303,18 @@ function renderViewMode(c: any) {
                     </button>
                 </div>
 
+                <!-- Current Date/Time Display (Daily view only) -->
+                <div id="currentDateTime" class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div class="flex items-center justify-center text-sm">
+                        <i class="fas fa-clock mr-2 text-blue-600"></i>
+                        <span class="text-gray-700">
+                            <span id="currentDateDisplay" class="font-semibold"></span>
+                            <span class="mx-2">•</span>
+                            <span id="currentTimeDisplay" class="font-mono"></span>
+                        </span>
+                    </div>
+                </div>
+
                 <!-- 직원 검색 (직원별 뷰에서만 표시) -->
                 <div id="employeeFilter" class="hidden mb-4">
                     <label class="block text-xs font-medium text-gray-700 mb-2">
