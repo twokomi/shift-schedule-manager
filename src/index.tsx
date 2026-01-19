@@ -421,11 +421,11 @@ function renderViewMode(c: any) {
 function renderEditMode(c: any) {
   return c.html(`
     <!DOCTYPE html>
-    <html lang="ko">
+    <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>근무표 관리 시스템</title>
+        <title>Shift Schedule Management System</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <style>
@@ -458,15 +458,15 @@ function renderEditMode(c: any) {
                     <div>
                         <h1 class="text-3xl font-bold text-gray-800 mb-2">
                             <i class="fas fa-calendar-alt mr-2"></i>
-                            근무표 관리 시스템
-                            <span class="ml-3 text-sm bg-orange-100 text-orange-600 px-3 py-1 rounded-full">편집 모드</span>
+                            Shift Schedule Manager
+                            <span class="ml-3 text-sm bg-orange-100 text-orange-600 px-3 py-1 rounded-full">Edit Mode</span>
                         </h1>
-                        <p class="text-gray-600">Day/Night 교대 근무 일정 관리</p>
+                        <p class="text-gray-600">Day/Night Shift Schedule Management</p>
                     </div>
                     <button onclick="window.location.href='/'" 
                             class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold transition">
                         <i class="fas fa-eye mr-2"></i>
-                        뷰 모드로
+                        View Mode
                     </button>
                 </div>
             </div>
@@ -475,17 +475,17 @@ function renderEditMode(c: any) {
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold text-gray-800">
                         <i class="fas fa-filter mr-2"></i>
-                        기간 선택
+                        Select Date Range
                     </h2>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">시작일</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
                         <input type="date" id="startDate" value="2026-01-15" 
                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">종료일</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">End Date</label>
                         <input type="date" id="endDate" value="2026-02-01" 
                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
@@ -493,7 +493,7 @@ function renderEditMode(c: any) {
                         <button onclick="loadSchedules()" 
                                 class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md transition duration-200">
                             <i class="fas fa-search mr-2"></i>
-                            조회
+                            Search
                         </button>
                     </div>
                 </div>
@@ -503,7 +503,7 @@ function renderEditMode(c: any) {
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold text-gray-800">
                         <i class="fas fa-table mr-2"></i>
-                        근무표
+                        Schedule
                     </h2>
                     <div class="flex gap-2">
                         <span class="team-badge-A px-3 py-1 rounded-full text-sm">Team A</span>
@@ -515,7 +515,7 @@ function renderEditMode(c: any) {
                 <div id="scheduleContainer" class="overflow-x-auto">
                     <div class="text-center py-8 text-gray-500">
                         <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
-                        <p>근무표를 불러오는 중...</p>
+                        <p>Loading schedule...</p>
                     </div>
                 </div>
             </div>

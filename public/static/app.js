@@ -1,22 +1,22 @@
-// 근무표 데이터 저장
+// Schedule data storage
 let schedulesData = [];
-let copiedData = null; // 복사된 데이터 저장
-let pendingChanges = []; // 저장 대기 중인 변경사항
+let copiedData = null; // Copied data storage
+let pendingChanges = []; // Pending changes
 
-// 드래그 선택 관련 변수
+// Drag selection variables
 let isDragging = false;
 let dragStartCell = null;
 
 // Undo/Redo 관련 변수
-let undoStack = []; // 되돌리기 스택
-let redoStack = []; // 다시 실행 스택
+let undoStack = []; // Undo stack
+let redoStack = []; // Redo stack
 
-// 페이지 로드 시 실행
+// Execute on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadSchedules();
 });
 
-// 근무표 조회
+// Load schedules
 async function loadSchedules() {
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
@@ -25,7 +25,7 @@ async function loadSchedules() {
     container.innerHTML = `
         <div class="text-center py-8 text-gray-500">
             <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
-            <p>근무표를 불러오는 중...</p>
+            <p>Loading schedule...</p>
         </div>
     `;
 
@@ -36,7 +36,7 @@ async function loadSchedules() {
 
         if (response.data.success) {
             schedulesData = response.data.data;
-            pendingChanges = []; // 조회 시 대기 중인 변경사항 초기화
+            pendingChanges = []; // Clear pending changes on load
             renderSchedules(schedulesData);
             updateSaveButtonState();
         } else {
@@ -52,14 +52,14 @@ async function loadSchedules() {
         container.innerHTML = `
             <div class="text-center py-8 text-red-500">
                 <i class="fas fa-exclamation-triangle text-3xl mb-2"></i>
-                <p>근무표를 불러오는데 실패했습니다.</p>
+                <p>Failed to load schedule.</p>
                 <p class="text-sm mt-2">${error.message}</p>
             </div>
         `;
     }
 }
 
-// 근무표 렌더링
+// Render schedules
 function renderSchedules(schedules) {
     const container = document.getElementById('scheduleContainer');
 
@@ -67,13 +67,13 @@ function renderSchedules(schedules) {
         container.innerHTML = `
             <div class="text-center py-8 text-gray-500">
                 <i class="fas fa-info-circle text-3xl mb-2"></i>
-                <p>표시할 근무표가 없습니다.</p>
+                <p>No schedules to display.</p>
             </div>
         `;
         return;
     }
 
-    // 날짜별로 그룹화
+    // Group by date
     const dateGroups = {};
     schedules.forEach(schedule => {
         if (!dateGroups[schedule.date]) {
@@ -91,7 +91,7 @@ function renderSchedules(schedules) {
         }
     });
 
-    // 테이블 형식으로 렌더링
+    // Render as table
     let html = `
         <div class="mb-4 p-4 bg-white border border-gray-200 rounded-lg flex items-center justify-between">
             <div class="text-sm text-blue-600" id="copiedInfo" style="display: none;">
@@ -99,11 +99,11 @@ function renderSchedules(schedules) {
                 <span id="copiedText"></span>
             </div>
             <div class="flex gap-2 items-center ml-auto">
-                <span class="text-sm text-gray-600" id="pendingCount">저장되지 않은 변경사항: 0개</span>
+                <span class="text-sm text-gray-600" id="pendingCount">Unsaved changes: 0개</span>
                 <button id="saveAllBtn" onclick="saveAllChanges()" disabled
                         class="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-md transition duration-200">
                     <i class="fas fa-save mr-2"></i>
-                    모두 저장
+                    Save All
                 </button>
             </div>
         </div>
@@ -196,7 +196,7 @@ function renderSchedules(schedules) {
         </div>
     `;
 
-    // 담당자별 근무시간 집계 추가
+    // Employee Work Hours Summary 추가
     html += renderEmployeeSummary(schedules);
 
     container.innerHTML = html;
@@ -230,14 +230,14 @@ function renderCell(scheduleId, position, assignment) {
     `;
 }
 
-// 담당자별 근무시간 집계 렌더링
+// Render employee work hours summary
 function renderEmployeeSummary(schedules) {
-    // Day shift: 12.5시간 (05:30~18:00)
-    // Night shift: 12.5시간 (17:30~06:00)
+    // Day shift: 12.5hrs (05:30~18:00)
+    // Night shift: 12.5hrs (17:30~06:00)
     const DAY_SHIFT_HOURS = 12.5;
     const NIGHT_SHIFT_HOURS = 12.5;
     
-    // 담당자별 근무시간 집계
+    // Employee Work Hours Summary
     const employeeHours = {};
     
     schedules.forEach(schedule => {
@@ -261,7 +261,7 @@ function renderEmployeeSummary(schedules) {
                     employeeHours[name].totalHours += NIGHT_SHIFT_HOURS;
                 }
                 
-                // 팀 정보 업데이트 (가장 최근 팀 정보 사용)
+                // Team 정보 업데이트 (가장 최근 Team 정보 사용)
                 if (assignment.team) {
                     employeeHours[name].team = assignment.team;
                 }
@@ -285,40 +285,40 @@ function renderEmployeeSummary(schedules) {
         <div class="mt-6 bg-white rounded-lg shadow-lg p-6">
             <h2 class="text-xl font-bold text-gray-800 mb-4">
                 <i class="fas fa-user-clock mr-2"></i>
-                담당자별 근무시간 집계
+                Employee Work Hours Summary
             </h2>
             <div class="overflow-x-auto">
                 <table id="${tableId}" class="min-w-full border-collapse">
                     <thead>
                         <tr class="bg-gray-100">
                             <th class="border border-gray-300 px-4 py-2 text-left font-semibold cursor-pointer hover:bg-gray-200" 
-                                onclick="sortTable('name')" title="클릭하여 정렬">
-                                담당자 
+                                onclick="sortTable('name')" title="Click to sort">
+                                Employee 
                                 <i class="fas fa-sort ml-1 text-gray-400"></i>
                             </th>
                             <th class="border border-gray-300 px-4 py-2 text-center font-semibold cursor-pointer hover:bg-gray-200" 
-                                onclick="sortTable('team')" title="클릭하여 정렬">
-                                팀 
+                                onclick="sortTable('team')" title="Click to sort">
+                                Team 
                                 <i class="fas fa-sort ml-1 text-gray-400"></i>
                             </th>
                             <th class="border border-gray-300 px-4 py-2 text-center font-semibold cursor-pointer hover:bg-gray-200" 
-                                onclick="sortTable('dayCount')" title="클릭하여 정렬">
-                                Day 근무 
+                                onclick="sortTable('dayCount')" title="Click to sort">
+                                Day Shifts 
                                 <i class="fas fa-sort ml-1 text-gray-400"></i>
                             </th>
                             <th class="border border-gray-300 px-4 py-2 text-center font-semibold cursor-pointer hover:bg-gray-200" 
-                                onclick="sortTable('nightCount')" title="클릭하여 정렬">
-                                Night 근무 
+                                onclick="sortTable('nightCount')" title="Click to sort">
+                                Night Shifts 
                                 <i class="fas fa-sort ml-1 text-gray-400"></i>
                             </th>
                             <th class="border border-gray-300 px-4 py-2 text-center font-semibold cursor-pointer hover:bg-gray-200" 
-                                onclick="sortTable('totalDays')" title="클릭하여 정렬">
-                                총 근무일 
+                                onclick="sortTable('totalDays')" title="Click to sort">
+                                Total Days 
                                 <i class="fas fa-sort ml-1 text-gray-400"></i>
                             </th>
                             <th class="border border-gray-300 px-4 py-2 text-center font-semibold cursor-pointer hover:bg-gray-200" 
-                                onclick="sortTable('totalHours')" title="클릭하여 정렬">
-                                총 근무시간 
+                                onclick="sortTable('totalHours')" title="Click to sort">
+                                Total Hours 
                                 <i class="fas fa-sort ml-1 text-gray-400"></i>
                             </th>
                         </tr>
@@ -334,15 +334,15 @@ function renderEmployeeSummary(schedules) {
                 <td class="border border-gray-300 px-4 py-2 text-center">
                     ${data.team ? `<span class="team-badge-${data.team} px-2 py-1 rounded text-xs font-semibold">${data.team}</span>` : '-'}
                 </td>
-                <td class="border border-gray-300 px-4 py-2 text-center">${data.dayCount}일</td>
-                <td class="border border-gray-300 px-4 py-2 text-center">${data.nightCount}일</td>
-                <td class="border border-gray-300 px-4 py-2 text-center font-semibold">${totalDays}일</td>
-                <td class="border border-gray-300 px-4 py-2 text-center font-semibold text-blue-600">${data.totalHours.toFixed(1)}시간</td>
+                <td class="border border-gray-300 px-4 py-2 text-center">${data.dayCount}days</td>
+                <td class="border border-gray-300 px-4 py-2 text-center">${data.nightCount}days</td>
+                <td class="border border-gray-300 px-4 py-2 text-center font-semibold">${totalDays}days</td>
+                <td class="border border-gray-300 px-4 py-2 text-center font-semibold text-blue-600">${data.totalHours.toFixed(1)}hrs</td>
             </tr>
         `;
     });
     
-    // 합계 행 추가
+    // Total 행 추가
     const totalDayCount = sortedEmployees.reduce((sum, [_, data]) => sum + data.dayCount, 0);
     const totalNightCount = sortedEmployees.reduce((sum, [_, data]) => sum + data.nightCount, 0);
     const totalDays = totalDayCount + totalNightCount;
@@ -350,11 +350,11 @@ function renderEmployeeSummary(schedules) {
     
     html += `
                         <tr class="bg-blue-50 font-bold">
-                            <td class="border border-gray-300 px-4 py-2" colspan="2">합계</td>
-                            <td class="border border-gray-300 px-4 py-2 text-center">${totalDayCount}일</td>
-                            <td class="border border-gray-300 px-4 py-2 text-center">${totalNightCount}일</td>
-                            <td class="border border-gray-300 px-4 py-2 text-center">${totalDays}일</td>
-                            <td class="border border-gray-300 px-4 py-2 text-center text-blue-600">${totalHours.toFixed(1)}시간</td>
+                            <td class="border border-gray-300 px-4 py-2" colspan="2">Total</td>
+                            <td class="border border-gray-300 px-4 py-2 text-center">${totalDayCount}days</td>
+                            <td class="border border-gray-300 px-4 py-2 text-center">${totalNightCount}days</td>
+                            <td class="border border-gray-300 px-4 py-2 text-center">${totalDays}days</td>
+                            <td class="border border-gray-300 px-4 py-2 text-center text-blue-600">${totalHours.toFixed(1)}hrs</td>
                         </tr>
                     </tbody>
                 </table>
@@ -370,7 +370,7 @@ let selectedCells = [];
 
 function selectCell(cellElement, isMultiSelect = false) {
     if (!isMultiSelect) {
-        // 단일 선택: 이전 선택 모두 해제
+        // 단days 선택: 이전 선택 모두 해제
         selectedCells.forEach(cell => {
             cell.style.outline = '';
         });
@@ -425,7 +425,7 @@ function handleKeyDown(event) {
         return;
     }
     
-    // Ctrl+Y / Cmd+Y: 다시 실행 (Redo)
+    // Ctrl+Y / Cmd+Y: Redo action (Redo)
     if ((event.ctrlKey || event.metaKey) && event.key === 'y') {
         event.preventDefault();
         redo();
@@ -457,7 +457,7 @@ function copySelectedCell() {
     // 복사 완료 표시
     const copiedInfo = document.getElementById('copiedInfo');
     const copiedText = document.getElementById('copiedText');
-    copiedText.textContent = `복사됨: ${team ? `[${team}] ` : ''}${employeeName || '(빈 셀)'}`;
+    copiedText.textContent = `Copied: ${team ? `[${team}] ` : ''}${employeeName || '(empty)'}`;
     copiedInfo.style.display = 'block';
 }
 
@@ -494,7 +494,7 @@ function removeAssignments(cellElements) {
     if (cellElements.length === 0) return;
     
     const count = cellElements.length;
-    if (confirm(`선택한 ${count}개 셀의 작업자를 제거하시겠습니까?`)) {
+    if (confirm(`Remove assignments from ${count}selected cells?`)) {
         // Undo를 위해 이전 상태 저장
         const previousStates = cellElements.map(cellElement => ({
             scheduleId: cellElement.getAttribute('data-schedule-id'),
@@ -528,7 +528,7 @@ function handleCellClick(event, cellElement) {
         return;
     }
     
-    // 일반 클릭: 단일 선택
+    // days반 클릭: 단days 선택
     selectCell(cellElement, false);
 }
 
@@ -659,10 +659,10 @@ function handleCellDoubleClick(event, cellElement) {
 
 // 배치 수정 (직접 입력)
 function editAssignment(cellElement, scheduleId, position, currentEmployee, currentTeam) {
-    const newEmployee = prompt(`직원 이름을 입력하세요 (현재: ${currentEmployee || '없음'}):`, currentEmployee);
+    const newEmployee = prompt(`Enter employee name (Current: ${currentEmployee || '없음'}):`, currentEmployee);
     if (newEmployee === null) return; // 취소
 
-    const newTeam = prompt(`팀을 입력하세요 (A, B, C, D) (현재: ${currentTeam || '없음'}):`, currentTeam);
+    const newTeam = prompt(`Team을 입력하세요 (A, B, C, D) (현재: ${currentTeam || '없음'}):`, currentTeam);
     if (newTeam === null) return; // 취소
 
     // Undo를 위해 이전 상태 저장
@@ -724,7 +724,7 @@ function updateSaveButtonState() {
     const countSpan = document.getElementById('pendingCount');
     
     if (saveBtn && countSpan) {
-        countSpan.textContent = `저장되지 않은 변경사항: ${pendingChanges.length}개`;
+        countSpan.textContent = `Unsaved changes: ${pendingChanges.length}개`;
         saveBtn.disabled = pendingChanges.length === 0;
     }
 }
@@ -735,7 +735,7 @@ async function saveAllChanges() {
     
     const saveBtn = document.getElementById('saveAllBtn');
     saveBtn.disabled = true;
-    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>저장 중...';
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
     
     let successCount = 0;
     let failCount = 0;
@@ -767,17 +767,17 @@ async function saveAllChanges() {
     
     // 결과 표시
     if (failCount === 0) {
-        alert(`모든 변경사항이 저장되었습니다. (${successCount}개)`);
+        alert(`All changes saved successfully. (${successCount}개)`);
         pendingChanges = [];
         
         // 저장 후 자동으로 스케줄 새로고침하여 집계 업데이트
         await loadSchedules();
     } else {
-        alert(`저장 완료: ${successCount}개\n실패: ${failCount}개`);
+        alert(`Saved: ${successCount}개\nFailed: ${failCount}개`);
         // 실패한 항목들만 남김
         pendingChanges = pendingChanges.slice(successCount);
         
-        saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>모두 저장';
+        saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Save All';
         updateSaveButtonState();
     }
 }
@@ -809,7 +809,7 @@ function undo() {
     
     const action = undoStack.pop();
     
-    // 현재 상태를 Redo 스택에 저장
+    // Save current state to redo stack
     const currentStates = action.cells.map(cell => {
         const cellElement = document.querySelector(
             `[data-schedule-id="${cell.scheduleId}"][data-position="${cell.position}"]`
@@ -828,7 +828,7 @@ function undo() {
         newValue: action.newValue
     });
     
-    // 이전 상태로 복원
+    // Restore previous state
     action.cells.forEach(cell => {
         const cellElement = document.querySelector(
             `[data-schedule-id="${cell.scheduleId}"][data-position="${cell.position}"]`
@@ -842,13 +842,13 @@ function undo() {
 
 function redo() {
     if (redoStack.length === 0) {
-        console.log('다시 실행할 작업이 없습니다.');
+        console.log('Redo action할 작업이 없습니다.');
         return;
     }
     
     const action = redoStack.pop();
     
-    // 현재 상태를 Undo 스택에 저장
+    // Save current state to undo stack
     const currentStates = action.cells.map(cell => {
         const cellElement = document.querySelector(
             `[data-schedule-id="${cell.scheduleId}"][data-position="${cell.position}"]`
@@ -867,7 +867,7 @@ function redo() {
         newValue: action.newValue
     });
     
-    // 다시 실행
+    // Redo action
     action.cells.forEach(cell => {
         const cellElement = document.querySelector(
             `[data-schedule-id="${cell.scheduleId}"][data-position="${cell.position}"]`
@@ -905,7 +905,7 @@ function sortTable(column) {
     const tbody = document.getElementById('employeeSummaryBody');
     if (!tbody) return;
     
-    // 합계 행 제외하고 데이터 행만 가져오기
+    // Total 행 제외하고 데이터 행만 가져오기
     const rows = Array.from(tbody.querySelectorAll('tr:not(.bg-blue-50)'));
     const summaryRow = tbody.querySelector('tr.bg-blue-50');
     
