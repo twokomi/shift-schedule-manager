@@ -6,15 +6,24 @@ let currentView = 'all'; // 'all' or 'employee'
 
 // Execute on page load
 document.addEventListener('DOMContentLoaded', () => {
-    loadSchedules();
-    loadEmployeeList();
+    // Set today's date as default for Daily view
+    const today = new Date().toISOString().split('T')[0];
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
     
-    // Set current month
+    if (startDateInput) startDateInput.value = today;
+    if (endDateInput) endDateInput.value = today;
+    
+    // Set current month for Monthly view
     const now = new Date();
     const monthSelect = document.getElementById('monthSelect');
     if (monthSelect) {
         monthSelect.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     }
+    
+    // Load data after setting dates
+    loadEmployeeList();
+    loadSchedules();
 });
 
 // Switch view

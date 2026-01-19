@@ -383,13 +383,6 @@ function renderViewMode(c: any) {
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script src="/static/view.js"></script>
         <script>
-            // Set today's date as default for Daily view
-            document.addEventListener('DOMContentLoaded', () => {
-                const today = new Date().toISOString().split('T')[0];
-                document.getElementById('startDate').value = today;
-                document.getElementById('endDate').value = today;
-            });
-            
             function promptEditMode() {
                 const password = prompt('Enter edit mode password:');
                 if (password) {
