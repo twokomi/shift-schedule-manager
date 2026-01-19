@@ -312,25 +312,48 @@ function renderViewMode(c: any) {
                     <div id="employeeCheckboxes" class="space-y-2 mb-3 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
                         <!-- JavaScript로 동적 생성 -->
                     </div>
-                    <div class="text-xs text-gray-500">
+                    <div class="text-xs text-gray-500 mb-3">
                         <i class="fas fa-info-circle mr-1"></i>
                         선택한 직원: <span id="selectedCount" class="font-semibold">0명</span>
                     </div>
+                    
+                    <!-- 월 선택 (직원별 뷰 전용) -->
+                    <div class="mb-3">
+                        <label class="block text-xs font-medium text-gray-700 mb-1">조회 월</label>
+                        <select id="monthSelect" 
+                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="2026-01">2026년 1월</option>
+                            <option value="2026-02">2026년 2월</option>
+                            <option value="2026-03">2026년 3월</option>
+                            <option value="2026-04">2026년 4월</option>
+                            <option value="2026-05">2026년 5월</option>
+                            <option value="2026-06">2026년 6월</option>
+                            <option value="2026-07">2026년 7월</option>
+                            <option value="2026-08">2026년 8월</option>
+                            <option value="2026-09">2026년 9월</option>
+                            <option value="2026-10">2026년 10월</option>
+                            <option value="2026-11">2026년 11월</option>
+                            <option value="2026-12">2026년 12월</option>
+                        </select>
+                    </div>
                 </div>
 
-                <!-- 기간 선택 -->
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-700 mb-1">시작일</label>
-                        <input type="date" id="startDate" value="2026-01-15" 
-                               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-700 mb-1">종료일</label>
-                        <input type="date" id="endDate" value="2026-02-01" 
-                               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <!-- 기간 선택 (전체 뷰에서만 표시) -->
+                <div id="dateRangeFilter">
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">시작일</label>
+                            <input type="date" id="startDate" value="2026-01-15" 
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">종료일</label>
+                            <input type="date" id="endDate" value="2026-02-01" 
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
                     </div>
                 </div>
+                
                 <button onclick="loadSchedules()" 
                         class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-200">
                     <i class="fas fa-search mr-2"></i>

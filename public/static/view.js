@@ -8,6 +8,13 @@ let currentView = 'all'; // 'all' or 'employee'
 document.addEventListener('DOMContentLoaded', () => {
     loadSchedules();
     loadEmployeeList();
+    
+    // 현재 월로 설정
+    const now = new Date();
+    const monthSelect = document.getElementById('monthSelect');
+    if (monthSelect) {
+        monthSelect.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
 });
 
 // 뷰 전환
@@ -18,15 +25,18 @@ function switchView(viewType) {
     const allBtn = document.getElementById('viewAll');
     const employeeBtn = document.getElementById('viewEmployee');
     const employeeFilter = document.getElementById('employeeFilter');
+    const dateRangeFilter = document.getElementById('dateRangeFilter');
     
     if (viewType === 'all') {
         allBtn.className = 'flex-1 py-2 px-3 rounded-lg font-semibold bg-blue-500 text-white transition';
         employeeBtn.className = 'flex-1 py-2 px-3 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition';
         employeeFilter.classList.add('hidden');
+        dateRangeFilter.classList.remove('hidden');
     } else {
         allBtn.className = 'flex-1 py-2 px-3 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition';
         employeeBtn.className = 'flex-1 py-2 px-3 rounded-lg font-semibold bg-blue-500 text-white transition';
         employeeFilter.classList.remove('hidden');
+        dateRangeFilter.classList.add('hidden');
     }
     
     // 데이터 다시 렌더링
@@ -94,9 +104,25 @@ function updateSelectedCount() {
 
 // 근무표 불러오기
 async function loadSchedules() {
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
     const container = document.getElementById('scheduleContainer');
+    
+    let startDate, endDate;
+    
+    if (currentView === 'employee') {
+        // 직원별 뷰: 선택한 월의 1일부터 마지막 날까지
+        const monthSelect = document.getElementById('monthSelect');
+        const selectedMonth = monthSelect ? monthSelect.value : '2026-01';
+        const [year, month] = selectedMonth.split('-');
+        startDate = `${year}-${month}-01`;
+        
+        // 해당 월의 마지막 날 계산
+        const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+        endDate = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
+    } else {
+        // 전체 뷰: 시작일/종료일 사용
+        startDate = document.getElementById('startDate').value;
+        endDate = document.getElementById('endDate').value;
+    }
     
     container.innerHTML = `
         <div class="text-center py-8 text-gray-500">
@@ -137,6 +163,14 @@ async function loadSchedules() {
 function renderView() {
     if (currentView === 'employee' && selectedEmployees.size > 0) {
         renderEmployeeCalendarView();
+    } else if (currentView === 'employee') {
+        const container = document.getElementById('scheduleContainer');
+        container.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-info-circle text-3xl mb-2"></i>
+                <p>직원을 선택해주세요.</p>
+            </div>
+        `;
     } else {
         renderMobileView(schedulesData);
     }
@@ -156,26 +190,42 @@ function renderEmployeeCalendarView() {
         return;
     }
 
-    // 선택된 직원의 근무일 수집
-    const employeeWorkDays = {};
-    selectedEmployees.forEach(emp => {
-        employeeWorkDays[emp] = new Set();
-    });
+    // 선택된 직원의 근무일 수집 (날짜별로 근무하는 직원 목록)
+    const workDaysByDate = {}; // { '2026-01-15': ['Bumsoo', 'Chris'], ... }
 
     schedulesData.forEach(schedule => {
         schedule.assignments.forEach(assignment => {
             if (selectedEmployees.has(assignment.employee_name)) {
-                employeeWorkDays[assignment.employee_name].add(schedule.date);
+                if (!workDaysByDate[schedule.date]) {
+                    workDaysByDate[schedule.date] = [];
+                }
+                if (!workDaysByDate[schedule.date].includes(assignment.employee_name)) {
+                    workDaysByDate[schedule.date].push(assignment.employee_name);
+                }
             }
         });
     });
 
-    // 날짜 범위 생성
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    const dates = generateDateRange(startDate, endDate);
+    // 선택한 월의 1일부터 마지막 날까지 날짜 생성
+    const monthSelect = document.getElementById('monthSelect');
+    const selectedMonth = monthSelect ? monthSelect.value : '2026-01';
+    const [year, month] = selectedMonth.split('-');
+    const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+    
+    const dates = [];
+    for (let day = 1; day <= lastDay; day++) {
+        const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
+        const dateObj = new Date(dateStr + 'T00:00:00');
+        dates.push({
+            dateStr: dateStr,
+            day: day,
+            dayOfWeek: dateObj.getDay(),
+            month: parseInt(month)
+        });
+    }
 
     // 캘린더 렌더링
+    const selectedNames = Array.from(selectedEmployees).join(', ');
     let html = `
         <div class="bg-white rounded-lg shadow-md overflow-hidden mb-4">
             <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-4">
@@ -183,15 +233,15 @@ function renderEmployeeCalendarView() {
                     <i class="fas fa-calendar-check mr-2"></i>
                     근무 캘린더
                 </h3>
-                <p class="text-sm text-purple-100 mt-1">선택한 직원: ${Array.from(selectedEmployees).join(', ')}</p>
+                <p class="text-sm text-purple-100 mt-1">선택한 직원: ${selectedNames}</p>
             </div>
             <div class="p-4">
-                ${renderCalendar(dates, employeeWorkDays)}
+                ${renderCalendar(dates, workDaysByDate)}
             </div>
         </div>
     `;
 
-    // 아래에 상세 근무표 추가
+    // 아래에 상세 근무표 추가 (선택된 직원이 근무하는 날만)
     html += '<div class="space-y-4">';
     
     const schedulesByDate = {};
@@ -213,65 +263,41 @@ function renderEmployeeCalendarView() {
     });
 
     Object.keys(schedulesByDate).sort().forEach(date => {
+        if (!workDaysByDate[date] || workDaysByDate[date].length === 0) {
+            return; // 선택된 직원이 근무하지 않는 날은 스킵
+        }
+        
         const dayData = schedulesByDate[date];
         const dateObj = new Date(date + 'T00:00:00');
         const formattedDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
         
-        // 이 날짜에 선택된 직원이 근무하는지 확인
-        let hasSelectedEmployee = false;
-        selectedEmployees.forEach(emp => {
-            if (employeeWorkDays[emp].has(date)) {
-                hasSelectedEmployee = true;
-            }
-        });
-
-        // 선택된 직원이 근무하는 날만 표시
-        if (hasSelectedEmployee) {
-            html += `
-                <div class="bg-white rounded-lg shadow-md overflow-hidden border-2 border-purple-300">
-                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <h3 class="text-xl font-bold">${formattedDate} (${dayData.day_of_week})</h3>
-                                <p class="text-sm text-blue-100">${date}</p>
-                            </div>
+        html += `
+            <div class="bg-white rounded-lg shadow-md overflow-hidden border-2 border-purple-300">
+                <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-xl font-bold">${formattedDate} (${dayData.day_of_week})</h3>
+                            <p class="text-sm text-blue-100">${date}</p>
                         </div>
                     </div>
-                    
-                    ${dayData.day ? renderShiftCardFiltered('Day', '05:30-18:00', dayData.day.assignments, 'bg-yellow-50') : ''}
-                    ${dayData.night ? renderShiftCardFiltered('Night', '17:30-06:00', dayData.night.assignments, 'bg-blue-50') : ''}
                 </div>
-            `;
-        }
+                
+                ${dayData.day ? renderShiftCardFiltered('Day', '05:30-18:00', dayData.day.assignments, 'bg-yellow-50') : ''}
+                ${dayData.night ? renderShiftCardFiltered('Night', '17:30-06:00', dayData.night.assignments, 'bg-blue-50') : ''}
+            </div>
+        `;
     });
     
     html += '</div>';
     container.innerHTML = html;
 }
 
-// 날짜 범위 생성
-function generateDateRange(startDate, endDate) {
-    const dates = [];
-    const start = new Date(startDate + 'T00:00:00');
-    const end = new Date(endDate + 'T00:00:00');
-    
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        dates.push({
-            dateStr: `${year}-${month}-${day}`,
-            day: d.getDate(),
-            dayOfWeek: d.getDay(),
-            month: d.getMonth() + 1
-        });
-    }
-    return dates;
-}
-
-// 캘린더 렌더링
-function renderCalendar(dates, employeeWorkDays) {
+// 캘린더 렌더링 (Outlook 스타일)
+function renderCalendar(dates, workDaysByDate) {
     const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    
+    // 1일의 요일 확인
+    const firstDayOfWeek = dates[0].dayOfWeek;
     
     let html = `
         <div class="grid grid-cols-7 gap-1 text-center">
@@ -282,33 +308,49 @@ function renderCalendar(dates, employeeWorkDays) {
             `).join('')}
     `;
 
-    dates.forEach((date, idx) => {
-        // 이 날짜에 선택된 직원이 근무하는지 확인
-        let hasWork = false;
-        let workingEmployees = [];
-        selectedEmployees.forEach(emp => {
-            if (employeeWorkDays[emp].has(date.dateStr)) {
-                hasWork = true;
-                workingEmployees.push(emp);
-            }
-        });
+    // 빈 칸 추가 (1일 전)
+    for (let i = 0; i < firstDayOfWeek; i++) {
+        html += '<div class="aspect-square"></div>';
+    }
+
+    // 날짜 렌더링
+    dates.forEach((date) => {
+        const workingEmployees = workDaysByDate[date.dateStr] || [];
+        const hasWork = workingEmployees.length > 0;
 
         const isToday = date.dateStr === new Date().toISOString().split('T')[0];
         const isSunday = date.dayOfWeek === 0;
         const isSaturday = date.dayOfWeek === 6;
 
+        // Outlook 스타일: 같은 날 여러 직원 근무 시 각각 표시
+        let employeeLabels = '';
+        if (hasWork) {
+            workingEmployees.slice(0, 3).forEach((emp, idx) => {
+                const colors = ['bg-purple-400', 'bg-pink-400', 'bg-indigo-400', 'bg-blue-400', 'bg-green-400'];
+                const colorClass = colors[idx % colors.length];
+                employeeLabels += `
+                    <div class="${colorClass} text-white text-[8px] px-1 rounded mb-0.5 truncate">
+                        ${emp}
+                    </div>
+                `;
+            });
+            if (workingEmployees.length > 3) {
+                employeeLabels += `
+                    <div class="text-[8px] text-gray-600">+${workingEmployees.length - 3}</div>
+                `;
+            }
+        }
+
         html += `
-            <div class="relative aspect-square flex flex-col items-center justify-center rounded-lg border
-                ${hasWork ? 'bg-purple-100 border-purple-400 border-2' : 'bg-gray-50 border-gray-200'}
+            <div class="relative aspect-square flex flex-col items-start justify-start p-1 rounded-lg border
+                ${hasWork ? 'bg-purple-50 border-purple-300 border-2' : 'bg-gray-50 border-gray-200'}
                 ${isToday ? 'ring-2 ring-blue-500' : ''}">
                 <div class="text-xs font-semibold ${isSunday ? 'text-red-500' : isSaturday ? 'text-blue-500' : 'text-gray-700'}">
                     ${date.day}
                 </div>
-                ${hasWork ? `
-                    <div class="absolute bottom-0 w-full">
-                        <div class="h-1 bg-purple-500 rounded-full"></div>
-                    </div>
-                ` : ''}
+                <div class="w-full mt-1 space-y-0.5">
+                    ${employeeLabels}
+                </div>
             </div>
         `;
     });
